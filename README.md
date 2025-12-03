@@ -15,16 +15,11 @@ If you're playing the Steam version of Noita, you can download [Noita_Bingo] dir
 
 ### Online Setup
 Since Noita doesn't have it's own network system, you need to provide one (don't worry, it's easy)
-You have two options for this;
-```
-┌─────────────────┬──────────────┬──────────────┬───────────────────┬────────────┐
-│ Network Option  │ Multiplayer? │ Leaderboard? │ Win/Loss Records? │ Recommend? │
-├─────────────────┼──────────────┼──────────────┼───────────────────┼────────────┤
-│  Noita Online   │     Yes      │     Yes      │        Yes        │    Yes     │
-├─────────────────┼──────────────┼──────────────┼───────────────────┼────────────┤
-│  Self Hosting   │     Yes      │      No      │      Limited      │     No     │
-└─────────────────┴──────────────┴──────────────┴───────────────────┴────────────┘
-```
+You have two options for this;  
+| Network Option | Multiplayer? | Leaderboard? | Win/Loss Records? | Recommend? |
+| -------------- | ------------ | ------------ | ----------------- | ---------- |
+| Noita Online   | Yes          | Yes          | Yes               | Yes        |
+| HTTP Hosting   | Yes          | No           | Limited           | No         |
 
 #### Noita Online (Recommended)
 Noita Online is a standale multiplayer framework mod. In simple terms you install this mod and online just works now.
