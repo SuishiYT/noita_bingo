@@ -41,12 +41,12 @@ If you're unable to use Noita Online for any reason, there's a Docker and Setup 
 ## Features
 
 ### Multiple Gamemodes!
-#### Singleplayer
+***Singleplayer***
   - Traditional Bingo: Get 5 in a row as fast as you can!
   - Blackout: Complete all objectives on the board as fast as you can!
   - Rush: Race to complete as many randomized objectives as you can before time runs out!
 
-#### Multiplayer
+***Multiplayer***
   - Traditional Bingo: First to get 5 in a row wins!
   - Lockout: Compete for squares. First to 13 wins!
 
@@ -58,7 +58,7 @@ Can be enabled/disabled in mod settings.
 
 ### Fully Customizable!
 
-#### Customize every aspect of your game board!
+***Customize every aspect of your game board!***
 The data driven objective system allows for complete board customization, including;
 - Limit of total number of objectives that can appear by category or even disable entire objective categories all together
     Categories: Combat | Death | Wandbuilding | Inventory | Exploration | Events/Misc
@@ -67,7 +67,7 @@ The data driven objective system allows for complete board customization, includ
 - Save/Load custom game settings
 
 
-#### Custom Objectives (Roadmap)
+***Custom Objectives (Roadmap)***
 Create and play with your own custom Bingo objectives! You can choose to play with the default objectives, use your own, merge your custom objectives with the default ones, or even use multiple custom objective lists at the same time.
 Play however you want!
 
@@ -75,7 +75,7 @@ Place your custom objectives file in `path_to/custom/objectives` and configure o
 Example file provided in `path_to/custom/objectives_sample.lua`.
 
 
-#### Custom Objective Rewards (Roadmap)
+***Custom Objective Rewards (Roadmap)***
 Add your own list of custom objective rewards! Load one, load two, load as many as you want, with or without the default rewards. Do whatever you want, I'm not your dad.
 
 Place your custom rewards file in `path_to/custom/objective_rewards` and configure rewards in mod settings.
