@@ -1,0 +1,11 @@
+<Mod
+	name="Noita Bingo"
+	description="A comprehensive bingo mod for Noita featuring solo and multiplayer modes, customizable objectives, and flexible UI positioning"
+	request_no_api_restrictions="0"
+	is_game_mode="1"
+	dependencies="evaisa.mp"
+	ui_newgame_name="Noita Bingo"
+	ui_newgame_description="Customizable bingo experience with multiplayer support"
+	translation_csv_path="mods/noita_bingo/translations.csv"
+>
+</Mod>

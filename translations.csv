@@ -1,0 +1,7 @@
+en,Bingo,
+$mp_gamemode_bingo,Noita Bingo,
+$mp_gamemode_bingo_description,"A customizable bingo experience with multiple game modes and difficulty settings",
+$bingo_setting_board_size,Board Size,
+$bingo_setting_game_mode,Game Mode,
+$bingo_setting_difficulty,Difficulty,
+$bingo_setting_seed,Seed,

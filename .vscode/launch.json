@@ -1,0 +1,26 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Noita with Mod",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "& 'G:/Steam/steamapps/common/Noita/noita_dev.exe' -debug_lua",
+            "cwd": "G:/Steam/steamapps/common/Noita"
+        },
+        {
+            "name": "Launch Noita with Mod (No Intro)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "& 'G:/Steam/steamapps/common/Noita/noita_dev.exe' -debug_lua -no_logo_splashes",
+            "cwd": "G:/Steam/steamapps/common/Noita"
+        },
+        {
+            "name": "Launch Noita (Dev Mode)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "& 'G:/Steam/steamapps/common/Noita/noita_dev.exe' -debug_lua -no_logo_splashes -debug",
+            "cwd": "G:/Steam/steamapps/common/Noita"
+        }
+    ]
+}
