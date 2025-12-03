@@ -39,5 +39,6 @@
 ## Future Scope
 - Auto-Detecting Objective Completion
 - Objective Completion Rewards
+    - Separate file that lists reward data and links to objectives file by individual objective id
 - Ascend Game Mode
 - Auto-Detection with Custom Objective Lists
