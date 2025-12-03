@@ -61,7 +61,7 @@ function MenuSystem.new()
     self.game_settings = {
         board_size = 5,
         category_limits = {
-            combat = nil,
+            bloodshed = nil,
             deaths = nil,
             wandbuilding = nil,
             inventory = nil,
@@ -710,7 +710,7 @@ function MenuSystem:renderGameSettings(gui, screen_width, screen_height)
         content_y = content_y + 20
         
         local max_limit = self.game_settings.board_size * self.game_settings.board_size
-        local categories = {"combat", "deaths", "wandbuilding", "inventory", "exploration", "events_misc"}
+        local categories = {"bloodshed", "deaths", "wandbuilding", "inventory", "exploration", "events_misc"}
         local total_limits = 0
         
         for _, category in ipairs(categories) do

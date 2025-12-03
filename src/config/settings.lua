@@ -30,7 +30,7 @@ function Settings.new()
         
         -- Category weights (0.0 to 2.0)
         category_weights = {
-            combat = 1.0,
+            bloodshed = 1.0,
             deaths = 1.0,
             wandbuilding = 1.0,
             inventory = 1.0,
@@ -40,7 +40,7 @@ function Settings.new()
         
         -- Category limits (nil = no limit)
         category_limits = {
-            combat = nil,
+            bloodshed = nil,
             deaths = nil,
             wandbuilding = nil,
             inventory = nil,

@@ -45,7 +45,7 @@ return {
     -- Examples: 0.5 = half as likely, 1.5 = 50% more likely
     category_weights = {
         luck = 1.0,
-        combat = 1.0,
+        bloodshed = 1.0,
         exploration = 1.0,
         magic = 1.0,
         items = 1.0,
@@ -59,7 +59,7 @@ return {
     -- Useful for board diversity
     category_limits = {
         luck = nil,          -- No limit (comment out or set to number)
-        combat = nil,
+        bloodshed = nil,
         exploration = nil,
         magic = nil,
         items = nil,

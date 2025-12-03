@@ -56,7 +56,7 @@ Can be enabled/disabled in mod settings.
 ***Customize every aspect of your game board!***  
 The data driven objective system allows for complete board customization, including;
 - Limit of total number of objectives that can appear by category or even disable entire objective categories all together
-    Categories: Combat | Death | Wandbuilding | Inventory | Exploration | Events/Misc
+    Categories: Bloodshed | Death | Wandbuilding | Inventory | Exploration | Events/Misc
 - Luck Influence: How luck based the objectives should be
 - Difficulty
 - Save/Load custom game settings

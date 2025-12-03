@@ -3,12 +3,12 @@
 
 -- Default objectives for Bingo
 local DEFAULT_OBJECTIVES = {
-    -- Combat Category
-    { id = "combat_01", title = "Kill 50 Enemies", category = "combat", difficulty = "medium" },
-    { id = "combat_02", title = "Defeat a Boss", category = "combat", difficulty = "hard" },
-    { id = "combat_03", title = "Get Melee Damage Perk", category = "combat", difficulty = "easy" },
-    { id = "combat_04", title = "Kill an Enemy with Explosion", category = "combat", difficulty = "medium" },
-    { id = "combat_05", title = "Survive 20 Combat Encounters", category = "combat", difficulty = "medium" },
+    -- Bloodshed Category
+    { id = "bloodshed_01", title = "Kill 50 Enemies", category = "bloodshed", difficulty = "medium" },
+    { id = "bloodshed_02", title = "Defeat a Boss", category = "bloodshed", difficulty = "hard" },
+    { id = "bloodshed_03", title = "Get Melee Damage Perk", category = "bloodshed", difficulty = "easy" },
+    { id = "bloodshed_04", title = "Kill an Enemy with Explosion", category = "bloodshed", difficulty = "medium" },
+    { id = "bloodshed_05", title = "Survive 20 Bloodshed Encounters", category = "bloodshed", difficulty = "medium" },
     
     -- Deaths Category
     { id = "deaths_01", title = "Die to Fall Damage", category = "deaths", difficulty = "easy" },

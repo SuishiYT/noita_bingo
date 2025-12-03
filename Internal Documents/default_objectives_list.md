@@ -1,4 +1,4 @@
-# Combat
+# Bloodshed
 - Kill an enemy with a tablet
 - Die 5 times
 - Kill 50 enemies in a single run
@@ -36,7 +36,7 @@ x Obtain X spell
 - Have a wand with 0 cast time and 0 recharge delay
 - Build a wand that fires 3 or more types of explosives at once
 - Make a homing rock
-- Build a wand that cannot be fired due to lack of mana`
+- Build a wand that cannot be fired due to lack of mana
 x Build a wand with at least X DPS (there is some sort of dummy mod that I have seen before that shows DPS in holy mounds that we’d need to check out)
 
 

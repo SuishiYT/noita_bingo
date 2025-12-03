@@ -57,7 +57,7 @@ function CategorySystem.new()
     local self = setmetatable({}, CategorySystem)
     
     self.categories = {
-        combat = { weight = 1.0, limit = nil, objectives = {} },
+        bloodshed = { weight = 1.0, limit = nil, objectives = {} },
         deaths = { weight = 1.0, limit = nil, objectives = {} },
         wandbuilding = { weight = 1.0, limit = nil, objectives = {} },
         inventory = { weight = 1.0, limit = nil, objectives = {} },

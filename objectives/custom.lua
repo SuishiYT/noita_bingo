@@ -5,29 +5,29 @@
 -- They will be loaded automatically and combined with default objectives.
 
 CUSTOM_OBJECTIVES = {
-    -- ===== COMBAT CATEGORY =====
+    -- ===== BLOODSHED CATEGORY =====
     {
-        id = "custom_combat_01",
+        id = "custom_bloodshed_01",
         title = "Kill 100 Enemies",
-        category = "combat",
+        category = "bloodshed",
         difficulty = "medium"
     },
     {
-        id = "custom_combat_02",
+        id = "custom_bloodshed_02",
         title = "Defeat Mini-Boss",
-        category = "combat",
+        category = "bloodshed",
         difficulty = "hard"
     },
     {
-        id = "custom_combat_03",
+        id = "custom_bloodshed_03",
         title = "Use Melee Weapon",
-        category = "combat",
+        category = "bloodshed",
         difficulty = "easy"
     },
     {
-        id = "custom_combat_04",
+        id = "custom_bloodshed_04",
         title = "Kill Enemy with Environmental Hazard",
-        category = "combat",
+        category = "bloodshed",
         difficulty = "medium"
     },
     

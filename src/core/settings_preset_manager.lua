@@ -33,7 +33,7 @@ function SettingsPresetManager:getDefaultSettings()
         board_size = 5,
         category_limits = {
             luck = nil,
-            combat = nil,
+            bloodshed = nil,
             exploration = nil,
             magic = nil,
             items = nil,

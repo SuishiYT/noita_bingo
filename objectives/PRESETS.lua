@@ -5,7 +5,7 @@
 -- Equal weight for all categories
 --[[
 category_weights = {
-    combat = 1.0,
+    bloodshed = 1.0,
     deaths = 1.0,
     wandbuilding = 1.0,
     inventory = 1.0,
@@ -13,7 +13,7 @@ category_weights = {
     events_misc = 1.0
 }
 category_limits = {
-    combat = nil,
+    bloodshed = nil,
     deaths = nil,
     wandbuilding = nil,
     inventory = nil,
@@ -22,11 +22,11 @@ category_limits = {
 }
 --]]
 
--- ===== PRESET 2: Combat Focus =====
--- Weighted toward combat objectives
+-- ===== PRESET 2: Bloodshed Focus =====
+-- Weighted toward bloodshed objectives
 --[[
 category_weights = {
-    combat = 2.0,         -- Double combat
+    bloodshed = 2.0,         -- Double bloodshed
     deaths = 0.5,         -- Reduce deaths
     wandbuilding = 1.0,
     inventory = 1.0,
@@ -34,7 +34,7 @@ category_weights = {
     events_misc = 0.8     -- Slightly reduce events
 }
 category_limits = {
-    combat = nil,         -- Unlimited combat
+    bloodshed = nil,         -- Unlimited bloodshed
     deaths = 2,           -- Max 2 deaths
     wandbuilding = nil,
     inventory = nil,
@@ -47,7 +47,7 @@ category_limits = {
 -- Focus on exploration and discovery
 --[[
 category_weights = {
-    combat = 1.2,         -- Increase combat slightly
+    bloodshed = 1.2,         -- Increase bloodshed slightly
     deaths = 0.5,         -- Reduce deaths
     wandbuilding = 1.0,
     inventory = 1.3,      -- More inventory management
@@ -55,7 +55,7 @@ category_weights = {
     events_misc = 1.5     -- More events/misc
 }
 category_limits = {
-    combat = 4,
+    bloodshed = 4,
     deaths = 2,
     wandbuilding = 3,
     inventory = 4,
@@ -68,7 +68,7 @@ category_limits = {
 -- Heavy focus on wand crafting and building
 --[[
 category_weights = {
-    combat = 1.0,
+    bloodshed = 1.0,
     deaths = 0.3,         -- Minimal deaths
     wandbuilding = 2.5,   -- Heavy wandbuilding focus
     inventory = 1.5,      -- More inventory (wand materials)
@@ -76,7 +76,7 @@ category_weights = {
     events_misc = 0.8
 }
 category_limits = {
-    combat = 3,
+    bloodshed = 3,
     deaths = 1,           -- Max 1 death objective
     wandbuilding = nil,   -- Unlimited wandbuilding
     inventory = nil,
@@ -89,7 +89,7 @@ category_limits = {
 -- Heavy on difficult objectives
 --[[
 category_weights = {
-    combat = 1.8,         -- Increase combat (often hard)
+    bloodshed = 1.8,         -- Increase bloodshed (often hard)
     deaths = 1.5,         -- More death challenges
     wandbuilding = 1.5,   -- Complex wand building
     inventory = 1.0,
@@ -97,7 +97,7 @@ category_weights = {
     events_misc = 1.2
 }
 category_limits = {
-    combat = nil,
+    bloodshed = nil,
     deaths = 3,           -- Up to 3 death objectives
     wandbuilding = nil,
     inventory = 2,
@@ -110,7 +110,7 @@ category_limits = {
 -- Quick objectives that can be done fast
 --[[
 category_weights = {
-    combat = 1.5,         -- Combat can be quick
+    bloodshed = 1.5,         -- Bloodshed can be quick
     deaths = 0.2,         -- Avoid death objectives (risky)
     wandbuilding = 0.5,   -- Less wandbuilding (slow)
     inventory = 1.5,      -- Inventory objectives (quick)
@@ -118,7 +118,7 @@ category_weights = {
     events_misc = 1.2     -- Events can be quick
 }
 category_limits = {
-    combat = 5,
+    bloodshed = 5,
     deaths = 1,           -- Max 1 death objective
     wandbuilding = 2,     -- Limited wandbuilding
     inventory = nil,
@@ -131,7 +131,7 @@ category_limits = {
 -- Remove death objectives, focus on survival
 --[[
 category_weights = {
-    combat = 1.5,
+    bloodshed = 1.5,
     deaths = 0.0,         -- No death objectives
     wandbuilding = 1.5,
     inventory = 1.5,
@@ -139,7 +139,7 @@ category_weights = {
     events_misc = 1.5
 }
 category_limits = {
-    combat = nil,
+    bloodshed = nil,
     deaths = 0,           -- Explicitly forbid deaths
     wandbuilding = nil,
     inventory = nil,
@@ -152,7 +152,7 @@ category_limits = {
 -- Maximum variety with hard limits on each category
 --[[
 category_weights = {
-    combat = 1.0,
+    bloodshed = 1.0,
     deaths = 1.0,
     wandbuilding = 1.0,
     inventory = 1.0,
@@ -160,7 +160,7 @@ category_weights = {
     events_misc = 1.0
 }
 category_limits = {
-    combat = 4,           -- 4 per category
+    bloodshed = 4,           -- 4 per category
     deaths = 4,
     wandbuilding = 4,
     inventory = 4,
