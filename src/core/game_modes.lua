@@ -19,7 +19,7 @@ function GameMode.new(board, is_multiplayer)
     self.board = board
     self.is_multiplayer = is_multiplayer or false
     self.completed = false
-    self.start_time = os.time()
+    self.start_time = GameGetFrameNum()
     
     return self
 end

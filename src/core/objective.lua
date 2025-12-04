@@ -22,13 +22,12 @@ function Objective.new(data)
     --- Field Error Handling
     if not data.id then error("Objective must have an id") end
     if not data.title then error("Objective must have a title") end
-    if not data.description then error("Objective must have a description") end
     if not data.category then error("Objective must have a category") end
     if not data.difficulty then error("Objective must have a difficulty") end
     
     self.id = data.id or "unknown"
     self.title = data.title or "Unknown Objective"
-    self.description = data.description or ""
+    self.description = data.description or data.title  -- Use title as fallback for description
     self.category = data.category or "general"
     self.difficulty = data.difficulty or "medium"
     self.reward_enabled = data.reward_enabled ~= false
@@ -108,6 +107,7 @@ function CategorySystem:registerObjective(objective)
     end
     
     table.insert(self.categories[objective.category].objectives, objective)
+    print("CategorySystem: Registered objective " .. objective.id .. " in category " .. objective.category)
 end
 
 ---Get objectives for board generation respecting weights and limits
@@ -116,6 +116,22 @@ end
 function CategorySystem:selectObjectives(count)
     local selected = {}
     local category_counts = {}
+    
+    -- Debug: log what categories we have
+    local total_obj_count = 0
+    for category, data in pairs(self.categories) do
+        local obj_count = #data.objectives
+        total_obj_count = total_obj_count + obj_count
+        if obj_count > 0 then
+            print("CategorySystem: Category '" .. category .. "' has " .. obj_count .. " objectives")
+        end
+    end
+    print("CategorySystem: Total objectives available: " .. total_obj_count)
+    
+    if total_obj_count == 0 then
+        print("ERROR: No objectives available for board generation!")
+        return selected
+    end
     
     -- Initialize category counts
     for category, _ in pairs(self.categories) do
@@ -131,8 +147,11 @@ function CategorySystem:selectObjectives(count)
     end
     
     if total_weight == 0 then
+        print("ERROR: Total weight is 0, cannot select objectives!")
         return selected
     end
+    
+    print("CategorySystem: Selecting " .. count .. " objectives...")
     
     -- Select objectives respecting weights and limits
     for i = 1, count do
@@ -173,6 +192,11 @@ function CategorySystem:selectObjectives(count)
             table.insert(selected, selected_obj)
             category_counts[selected_category] = category_counts[selected_category] + 1
         end
+    end
+    
+    print("CategorySystem: Successfully selected " .. #selected .. " objectives")
+    for i, obj in ipairs(selected) do
+        print("  [" .. i .. "] " .. obj.id .. " - " .. obj.title)
     end
     
     return selected

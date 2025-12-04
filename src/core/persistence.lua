@@ -126,7 +126,7 @@ function GameStatePersistence.loadGame()
     if game then
         game.board = board
         game.completed = ModSettingGet("noita_bingo.completed") == "true"
-        game.start_time = tonumber(ModSettingGet("noita_bingo.start_time")) or os.time()
+        game.start_time = tonumber(ModSettingGet("noita_bingo.start_time")) or GameGetFrameNum()
     end
     
     return game

@@ -1,45 +1,19 @@
 -- Noita Bingo Mod
 -- Main entry point for the bingo mod
 
--- Force evaisa.mp to load first if it exists but failed
-if ModIsEnabled("evaisa.mp") and not steam then
-    print("Bingo: Attempting to force-load evaisa.mp framework")
-    pcall(function()
-        dofile_once("mods/evaisa.mp/init.lua")
-    end)
-end
+local init_success, init_error = pcall(function()
 
--- Register gamemode with evaisa.mp if it's enabled
+-- Register gamemode with evaisa.mp if it's enabled (for multiplayer support)
+-- When Bingo is selected as a Noita gamemode, it automatically enables in evaisa.mp lobbies
 if ModIsEnabled("evaisa.mp") then
-    print("Bingo: Attempting to register gamemode with evaisa.mp")
+    print("Bingo: evaisa.mp detected - setting up multiplayer integration")
     
-    -- Try to append our gamemode to the gamemodes file
-    local success = pcall(function()
+    -- Try to append our gamemode to the evaisa.mp gamemodes file for multiplayer
+    pcall(function()
         ModLuaFileAppend("mods/evaisa.mp/data/gamemodes.lua", "mods/noita_bingo/src/multiplayer/bingo_gamemode_append.lua")
     end)
-    
-    -- Also append to lobby UI for gamemode selection
-    local ui_success = pcall(function()
-        ModLuaFileAppend("mods/evaisa.mp/files/scripts/lobby_ui.lua", "mods/noita_bingo/src/multiplayer/lobby_ui_append.lua")
-    end)
-    
-    if success then
-        print("Bingo: ModLuaFileAppend successful")
-        GamePrint("Bingo: Gamemode registration attempted")
-    else
-        print("Bingo: ModLuaFileAppend failed")
-        GamePrint("Bingo: Gamemode registration failed")
-    end
-    
-    if ui_success then
-        print("Bingo: Lobby UI modification successful")
-        GamePrint("Bingo: UI integration added")
-    else
-        print("Bingo: Lobby UI modification failed")
-    end
 else
-    print("Bingo: evaisa.mp not enabled - skipping gamemode registration")
-    GamePrint("Bingo: evaisa.mp not detected")
+    print("Bingo: evaisa.mp not enabled - multiplayer features unavailable")
 end
 
 print("=== NOITA BINGO MOD LOADING ===")
@@ -55,16 +29,21 @@ BingoConfig = {}
 BingoMultiplayer = {}
 BingoCore = {}
 
+print("Namespaces initialized successfully")
+
 -- Load files in dependency order - core first, then configs that depend on core
 local files_to_load = {
     -- Core classes first (no dependencies)
     "src/core/objective.lua",
-    "src/core/bingo_board.lua", 
+    "src/core/bingo_board.lua",
+    "src/core/game.lua",
     "src/core/game_modes.lua",
     "src/core/persistence.lua",
     "src/core/board_generator.lua",
     "src/core/settings_preset_manager.lua",
     "src/core/statistics_tracker.lua",
+    "src/core/auto_tracker.lua",
+    "src/core/event_hooks.lua",
     
     -- Config files (may depend on core)
     "src/config/settings.lua",
@@ -84,6 +63,7 @@ local files_to_load = {
 
 local loaded_files = 0
 local total_files = #files_to_load
+local failed_files = {}
 
 for i, file_path in ipairs(files_to_load) do
     local success, err = pcall(function()
@@ -93,13 +73,28 @@ for i, file_path in ipairs(files_to_load) do
     if success then
         loaded_files = loaded_files + 1
         print("Loaded: " .. file_path)
+        -- Show GamePrint for critical files
+        if file_path == "src/ui/menu_system.lua" then
+            GamePrint("[BINGO LOADER] menu_system.lua loaded successfully")
+        end
     else
         print("=== FAILED TO LOAD: " .. file_path .. " ===")
         print("Error: " .. tostring(err))
+        GamePrint("[BINGO LOADER] FAILED: " .. file_path)
+        GamePrint("Error: " .. tostring(err))
+        table.insert(failed_files, file_path)
     end
 end
 
 print("=== NOITA BINGO: Loaded " .. loaded_files .. "/" .. total_files .. " files ===")
+GamePrint("[BINGO LOADER] Loaded " .. loaded_files .. "/" .. total_files .. " files")
+
+if #failed_files > 0 then
+    GamePrint("[BINGO] Failed files: " .. table.concat(failed_files, ", "))
+    for i, f in ipairs(failed_files) do
+        print("  - " .. f)
+    end
+end
 
 -- Initialize multiplayer integration (after all files are loaded)
 if BingoMultiplayer then
@@ -111,11 +106,14 @@ end
 
 print("Noita Bingo initialization complete!")
 
--- GUI instance
-local gui = nil
+-- GUI instance (GLOBAL)
+gui = nil
 
--- Menu system
-local menu_system = nil
+-- Menu system (GLOBAL)
+menu_system = nil
+
+-- Debug frame counter
+local debug_frame_counter = 0
 
 -- Centralized GUI ID Manager
 local BingoGUIManager = {
@@ -159,11 +157,18 @@ end
 
 -- Initialize the mod
 function OnModInit()
+    GamePrint("=== NOITA BINGO: OnModInit called ===")
     print("=== NOITA BINGO: OnModInit called ===")
     GamePrint("NOITA BINGO: OnModInit executing")
     -- Ensure GUI is created if not already done
     if not gui then
         gui = GuiCreate()
+    end
+    
+    -- Verify core modules loaded
+    if not BingoCore.Objective then
+        print("CRITICAL ERROR: BingoCore.Objective not loaded. Aborting initialization.")
+        return
     end
     
     -- Initialize game state
@@ -201,14 +206,27 @@ function OnModInit()
     end
     
     -- Load objectives into category system
+    print("\n=== LOADING OBJECTIVES ===")
+    print("BingoConfig exists: " .. tostring(BingoConfig ~= nil))
+    print("BingoConfig.loadObjectives exists: " .. tostring(BingoConfig and BingoConfig.loadObjectives ~= nil))
+    print("BingoCore.Objective exists: " .. tostring(BingoCore and BingoCore.Objective ~= nil))
+    
     if BingoConfig.loadObjectives then
         local objectives = BingoConfig.loadObjectives()
+        print("Init: loadObjectives returned " .. #objectives .. " objectives")
         if objectives and BingoConfig.category_system.registerObjective then
             for _, obj in ipairs(objectives) do
                 BingoConfig.category_system:registerObjective(obj)
+                print("Init: Registered objective: " .. tostring(obj.id))
             end
+            print("Init: Successfully registered all objectives")
+        else
+            print("Init: ERROR - objectives list empty or registerObjective not available")
         end
+    else
+        print("Init: ERROR - BingoConfig.loadObjectives not found!")
     end
+    print("=== END LOADING OBJECTIVES ===\n")
     
     -- Initialize UI Manager
     if BingoUI.UIManager then
@@ -216,12 +234,36 @@ function OnModInit()
         if BingoUI.manager.initialize then
             BingoUI.manager:initialize()
         end
+        print("UI Manager initialized successfully")
     else
-        print("ERROR: BingoUI.UIManager not loaded!")
+        print("ERROR: BingoUI.UIManager not loaded! Creating fallback...")
         BingoUI.manager = { 
             update = function() end,
-            render = function() end,
+            render = function(self, game, gui)
+                -- Fallback render - just draw text so something shows
+                if game and game.board then
+                    GuiText(gui, 100, 100, "BINGO BOARD")
+                    GuiText(gui, 100, 120, "Size: " .. tostring(game.board.size))
+                    GuiText(gui, 100, 140, "Objectives: " .. tostring(#game.board.objectives or 0))
+                end
+            end,
             savePositions = function() end
+        }
+    end
+    
+    -- Initialize auto-tracker
+    if BingoCore.AutoTracker then
+        BingoBoardState.auto_tracker = BingoCore.AutoTracker.new()
+        print("AutoTracker initialized successfully")
+    else
+        print("ERROR: BingoCore.AutoTracker not loaded!")
+        BingoBoardState.auto_tracker = {
+            update = function() end,
+            checkObjective = function() return false end,
+            autoCheckBoard = function() return {} end,
+            recordEvent = function() end,
+            recordKill = function() end,
+            recordDeath = function() end
         }
     end
     
@@ -284,6 +326,7 @@ function OnModInit()
         }
     end
     
+    
     -- Don't auto-open menu during initialization
     -- Let the user open it manually with F6/T key
     -- The splash screen logic is handled in MenuSystem:open()
@@ -311,15 +354,29 @@ end
 function OnWorldPreUpdate()
     -- Gamemode is now registered via ModLuaFileAppend, no manual registration needed
     
+    debug_frame_counter = debug_frame_counter + 1
+    
     -- Handle input
     if menu_system then
-        -- Use proper key codes for menu toggle: F6 (63) and T (23)
-        if InputIsKeyJustDown(63) or InputIsKeyJustDown(23) then -- F6 or T key
+        -- Try multiple key codes for F6 and T
+        -- F6 is typically 63, but we'll check other variations too
+        local f6_pressed = InputIsKeyJustDown(63) or InputIsKeyJustDown(118) -- F6 or alternative
+        local t_pressed = InputIsKeyJustDown(23) or InputIsKeyJustDown(84) -- T or alternative
+        
+        if f6_pressed or t_pressed then
+            GamePrint("[BINGO] Menu key pressed!")
             if menu_system:isOpen() then
                 menu_system:close()
+                GamePrint("[BINGO] Menu CLOSED")
             else
                 menu_system:open()
+                GamePrint("[BINGO] Menu OPENED")
             end
+        end
+        
+        -- Debug output every 120 frames (2 seconds)
+        if debug_frame_counter % 120 == 0 then
+            GamePrint("[BINGO DEBUG] menu_system exists, state: " .. tostring(menu_system.current_state))
         end
         
         -- Update systems
@@ -330,6 +387,10 @@ function OnWorldPreUpdate()
         if BingoMultiplayer.sync then
             BingoMultiplayer.sync:update(1 / 60)
         end
+    else
+        if debug_frame_counter % 120 == 0 then
+            GamePrint("[BINGO] ERROR: menu_system is nil!")
+        end
     end
     
     if BingoBoardState.current_game then
@@ -338,6 +399,29 @@ function OnWorldPreUpdate()
         -- Don't update game time if timer is paused
         if not BingoBoardState.timer_paused then
             BingoBoardState.current_game:update(dt)
+        end
+        
+        -- Update auto-tracker
+        if BingoBoardState.auto_tracker then
+            BingoBoardState.auto_tracker:update(dt)
+            
+            -- Update event tracking (detects kills, deaths, events)
+            if BingoCore.EventHooks then
+                BingoCore.EventHooks.updateEventTracking()
+            end
+            
+            -- Auto-check board objectives every frame
+            local board = BingoBoardState.current_game.board
+            if board and BingoBoardState.current_game.objectives then
+                local cleared = BingoBoardState.auto_tracker:autoCheckBoard(board, BingoBoardState.current_game.objectives)
+                
+                -- Broadcast cleared squares to multiplayer if any were cleared
+                if #cleared > 0 and BingoMultiplayer and BingoMultiplayer.isMultiplayer() then
+                    for _, pos in ipairs(cleared) do
+                        BingoMultiplayer.clearSquare(pos.row, pos.col)
+                    end
+                end
+            end
         end
         
         -- Auto-save every 5 seconds
@@ -361,21 +445,74 @@ function OnWorldPostUpdate()
         BingoGUIManager.resetIDs()
         GuiStartFrame(gui)
         
-        -- Debug: Show menu state in bottom right (relative to screen size)
+        local screen_width, screen_height = GuiGetScreenDimensions(gui)
+        
+        -- Debug info - always visible
+        GuiColorSetForNextWidget(gui, 1, 1, 0, 1) -- Yellow
+        GuiText(gui, screen_width - 400, screen_height - 70, "[BINGO] Menu State: " .. tostring(menu_system and menu_system.current_state or "nil"))
+        
+        -- Show if menu is open or closed
         if menu_system then
-            local screen_width, screen_height = GuiGetScreenDimensions(gui)
-            GuiColorSetForNextWidget(gui, 1, 1, 0, 1) -- Yellow text
-            GuiText(gui, screen_width - 200, screen_height - 50, "Menu State: " .. tostring(menu_system.current_state))
+            local is_open = menu_system:isOpen()
+            if is_open then
+                GuiColorSetForNextWidget(gui, 0, 1, 0, 1) -- Green
+                GuiText(gui, screen_width - 400, screen_height - 50, "[BINGO] Menu is OPEN")
+            else
+                GuiColorSetForNextWidget(gui, 1, 0, 0, 1) -- Red
+                GuiText(gui, screen_width - 400, screen_height - 50, "[BINGO] Menu is CLOSED (Press F6/T)")
+            end
+        else
+            GuiColorSetForNextWidget(gui, 1, 0, 0, 1) -- Red
+            GuiText(gui, screen_width - 400, screen_height - 50, "[BINGO] ERROR: menu_system is nil!")
         end
         
         -- Render menu system
         if menu_system and menu_system:isOpen() then
-            menu_system:render(gui)
+            -- Try to render the actual menu
+            if menu_system.render then
+                menu_system:render(gui)
+            else
+                -- Fallback: render a simple test menu
+                GuiColorSetForNextWidget(gui, 0.2, 0.2, 0.2, 0.8)
+                GuiImage(gui, BingoGUIManager.getID(), 100, 100, "data/ui_gfx/1x1_white.png", 1, 500, 300)
+                
+                GuiColorSetForNextWidget(gui, 1, 1, 1, 1)
+                GuiText(gui, 120, 120, "TEST MENU - render() failed")
+                GuiText(gui, 120, 150, "menu_system.render = " .. tostring(menu_system.render))
+            end
         end
         
         -- Render the bingo board
-        if BingoBoardState.current_game and BingoUI.manager and BingoUI.manager.render then
-            BingoUI.manager:render(BingoBoardState.current_game, gui)
+        if BingoBoardState.current_game then
+            GamePrint("[BINGO] Rendering board, game exists")
+            
+            -- Ensure manager exists (create fallback if needed)
+            if not BingoUI.manager then
+                GamePrint("[BINGO] Creating fallback UI manager...")
+                BingoUI.manager = { 
+                    update = function() end,
+                    render = function(self, game, gui)
+                        -- Fallback render - just draw text so something shows
+                        if game and game.board then
+                            GuiText(gui, 100, 100, "BINGO BOARD")
+                            GuiText(gui, 100, 120, "Size: " .. tostring(game.board.size))
+                            GuiText(gui, 100, 140, "Objectives: " .. tostring(#game.board.objectives or 0))
+                        end
+                    end,
+                    savePositions = function() end
+                }
+            end
+            
+            if not BingoUI.manager.render then
+                GamePrint("[BINGO] ERROR: BingoUI.manager.render is nil!")
+            else
+                GamePrint("[BINGO] Calling BingoUI.manager:render()")
+                BingoUI.manager:render(BingoBoardState.current_game, gui)
+            end
+        else
+            if GameGetFrameNum() % 120 == 0 then
+                GamePrint("[BINGO] No current_game to render")
+            end
         end
         
         -- Render pause overlay if needed
@@ -496,9 +633,43 @@ end
 -- World initialization - this runs AFTER OnMagicNumbersAndWorldSeedInitialized
 -- This is where evaisa.mp loads its gamemodes table, so we register here
 function OnWorldInitialized()
-    print("Bingo: OnWorldInitialized - attempting gamemode registration")
+    print("Bingo: OnWorldInitialized - Bingo gamemode activated!")
+    GamePrint("Bingo: Game mode activated - Press F6 or T to open menu")
     
-    -- Wait a few frames to ensure evaisa.mp has fully loaded
-    BingoBoardState.gamemode_registration_attempts = 0
-    BingoBoardState.gamemode_registered = false
+    -- Initialize menu system if not already done
+    if not menu_system or menu_system.current_state == "error" then
+        GamePrint("[BINGO] Initializing menu system now...")
+        if BingoUI and BingoUI.MenuSystem then
+            menu_system = BingoUI.MenuSystem.new()
+            GamePrint("[BINGO] Menu system created!")
+        else
+            GamePrint("[BINGO] ERROR: BingoUI.MenuSystem not found!")
+            GamePrint("[BINGO] BingoUI exists: " .. tostring(BingoUI ~= nil))
+            if BingoUI then
+                local count = 0
+                for k, v in pairs(BingoUI) do
+                    GamePrint("[BINGO] BingoUI." .. k)
+                    count = count + 1
+                end
+                GamePrint("[BINGO] BingoUI has " .. count .. " entries")
+            end
+        end
+    end
+    
+    -- Auto-open the menu on game start
+    if menu_system and not menu_system:isOpen() then
+        menu_system:open()
+        GamePrint("Bingo: Opening menu...")
+        print("Bingo: Menu auto-opened on world initialization")
+    end
+end
+
+end) -- End of pcall wrapper
+
+if not init_success then
+    print("=== CRITICAL ERROR IN BINGO MOD INITIALIZATION ===")
+    print("Error: " .. tostring(init_error))
+    GamePrint("Bingo Mod: FAILED TO INITIALIZE - Check console for error")
+else
+    print("=== BINGO MOD INITIALIZATION SUCCESSFUL ===")
 end

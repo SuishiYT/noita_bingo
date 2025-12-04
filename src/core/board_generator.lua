@@ -41,7 +41,8 @@ end
 ---Shuffle a table in place
 ---@param t table
 function BoardGenerator.shuffleTable(t)
-    math.randomseed(GameGetFrameNum() + os.time())
+    -- Use GameGetFrameNum() as seed (os library not available in Noita)
+    math.randomseed(GameGetFrameNum())
     
     for i = #t, 2, -1 do
         local j = math.random(i)
@@ -54,33 +55,84 @@ end
 ---@param is_multiplayer boolean
 ---@return GameMode
 function BoardGenerator.createNewGame(game_type, is_multiplayer)
+    GamePrint("[BoardGen] createNewGame called with type=" .. tostring(game_type))
+    
     -- Get category system and settings
     local category_system = BingoConfig.category_system
     local settings = BingoConfig.settings
     
+    if not category_system then
+        GamePrint("[BoardGen] ERROR: BingoConfig.category_system is nil!")
+        return nil
+    end
+    if not settings then
+        GamePrint("[BoardGen] ERROR: BingoConfig.settings is nil!")
+        return nil
+    end
+    
+    GamePrint("[BoardGen] Calling generateBoard...")
+    
     -- Generate board
     local board = BoardGenerator.generateBoard(game_type, category_system, settings)
+    
+    if not board then
+        GamePrint("[BoardGen] ERROR: generateBoard returned nil!")
+        return nil
+    end
+    
+    GamePrint("[BoardGen] Board generated successfully with " .. #board.objectives .. " objectives")
     
     -- Create appropriate game mode
     local game = nil
     
     if game_type == "traditional" then
-        game = BingoCore.TraditionalBingo.new(board.objectives, is_multiplayer)
-        game.board = board
+        GamePrint("[BoardGen] Creating TraditionalBingo game...")
+        if BingoCore.TraditionalBingo then
+            game = BingoCore.TraditionalBingo.new(board.objectives, is_multiplayer)
+            game.board = board
+        else
+            GamePrint("[BoardGen] ERROR: BingoCore.TraditionalBingo not found!")
+        end
     elseif game_type == "lockout" then
-        game = BingoCore.Lockout.new(board.objectives)
-        game.board = board
+        GamePrint("[BoardGen] Creating Lockout game...")
+        if BingoCore.Lockout then
+            game = BingoCore.Lockout.new(board.objectives)
+            game.board = board
+        else
+            GamePrint("[BoardGen] ERROR: BingoCore.Lockout not found!")
+        end
     elseif game_type == "blackout" then
-        game = BingoCore.Blackout.new(board.objectives)
-        game.board = board
+        GamePrint("[BoardGen] Creating Blackout game...")
+        if BingoCore.Blackout then
+            game = BingoCore.Blackout.new(board.objectives)
+            game.board = board
+        else
+            GamePrint("[BoardGen] ERROR: BingoCore.Blackout not found!")
+        end
     elseif game_type == "rush" then
-        local time_limit = settings:get("rush_time_limit", 600)
-        game = BingoCore.Rush.new(board.objectives, time_limit)
-        game.board = board
+        GamePrint("[BoardGen] Creating Rush game...")
+        if BingoCore.Rush then
+            local time_limit = settings:get("rush_time_limit", 600)
+            game = BingoCore.Rush.new(board.objectives, time_limit)
+            game.board = board
+        else
+            GamePrint("[BoardGen] ERROR: BingoCore.Rush not found!")
+        end
     else
+        GamePrint("[BoardGen] Unknown game type, defaulting to traditional")
         -- Default to traditional
-        game = BingoCore.TraditionalBingo.new(board.objectives, is_multiplayer)
-        game.board = board
+        if BingoCore.TraditionalBingo then
+            game = BingoCore.TraditionalBingo.new(board.objectives, is_multiplayer)
+            game.board = board
+        else
+            GamePrint("[BoardGen] ERROR: BingoCore.TraditionalBingo not found even for fallback!")
+        end
+    end
+    
+    if game then
+        GamePrint("[BoardGen] Game created successfully!")
+    else
+        GamePrint("[BoardGen] ERROR: Game object was never created!")
     end
     
     return game

@@ -83,7 +83,7 @@ function MultiplayerSync:updatePlayers()
                 name = name,
                 score = 0,
                 cleared = {},
-                joined_at = os.time()
+                joined_at = GameGetFrameNum()
             }
             print("Bingo Sync: Added player " .. name)
         end
@@ -99,7 +99,7 @@ function MultiplayerSync:addPlayer(player_id, player_name)
         name = player_name,
         score = 0,
         cleared = {},
-        joined_at = os.time()
+        joined_at = GameGetFrameNum()
     }
 end
 
@@ -166,7 +166,7 @@ function MultiplayerSync:broadcastWin(player_id)
     
     local message = {
         player_id = player_id or self.player_id,
-        timestamp = os.time()
+        timestamp = GameGetFrameNum()
     }
     
     self:sendToOtherPlayers("game_win", message)

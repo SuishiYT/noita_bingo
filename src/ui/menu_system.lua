@@ -448,6 +448,56 @@ function MenuSystem:renderSingleplayerModeSelect(gui, screen_width, screen_heigh
     end
 end
 
+---Start a bingo game
+function MenuSystem:startGame()
+    GamePrint("[BINGO] Starting game with " .. self.game_settings.board_size .. "x" .. self.game_settings.board_size .. " board")
+    print("Bingo: Starting game...")
+    
+    -- Check if required systems are loaded
+    if not BingoCore or not BingoCore.BingoBoard then
+        GamePrint("[BINGO] ERROR: BingoCore.BingoBoard not loaded!")
+        return
+    end
+    
+    if not BingoConfig or not BingoConfig.category_system then
+        GamePrint("[BINGO] ERROR: BingoConfig.category_system not loaded!")
+        return
+    end
+    
+    if not BingoCore.Game then
+        GamePrint("[BINGO] ERROR: BingoCore.Game not loaded!")
+        return
+    end
+    
+    -- Select objectives first
+    local num_objectives = self.game_settings.board_size * self.game_settings.board_size
+    local objectives = BingoConfig.category_system:selectObjectives(num_objectives)
+    print("Bingo: Selected " .. #objectives .. " objectives")
+    GamePrint("[BINGO] Selected " .. #objectives .. " objectives")
+    
+    if #objectives == 0 then
+        GamePrint("[BINGO] ERROR: No objectives selected!")
+        return
+    end
+    
+    -- Create game state (Game constructor handles board creation)
+    local game = BingoCore.Game.new({
+        objectives = objectives,
+        mode = self.selected_mode or "traditional",
+        size = self.game_settings.board_size,
+        enable_rewards = self.game_settings.enable_rewards
+    })
+    
+    print("Bingo: Game created successfully")
+    GamePrint("[BINGO] Game started!")
+    
+    -- Set the global game state
+    BingoBoardState.current_game = game
+    
+    -- Close the menu to show the board
+    self:close()
+end
+
 ---Render multiplayer setup
 function MenuSystem:renderMultiplayerSetup(gui, screen_width, screen_height)
     local menu_width = math.min(500, screen_width - 100)
@@ -672,6 +722,10 @@ end
 
 ---Render game settings
 function MenuSystem:renderGameSettings(gui, screen_width, screen_height)
+    if GameGetFrameNum() % 120 == 0 then
+        GamePrint("[BINGO] renderGameSettings is being called")
+    end
+    
     -- Make menu responsive to screen size with constraints
     local menu_width = math.min(700, screen_width - 100)  -- Leave 100px margin
     local menu_height = math.min(500, screen_height - 100) -- Leave 100px margin
@@ -896,26 +950,57 @@ function MenuSystem:renderGameSettings(gui, screen_width, screen_height)
     end
     
     -- Start Game button  
-    GuiColorSetForNextWidget(gui, 1, 1, 1, 1) -- White text
-    if GuiButton(gui, self:getID(), menu_x + menu_width - 120, button_y, "Start Game") then
+    GuiColorSetForNextWidget(gui, 0.2, 1, 0.2, 1) -- Bright green
+    if self:renderButton(gui, menu_x + menu_width - 120, button_y, "Start Game") then
+        GamePrint("[BINGO] *** START GAME BUTTON CLICKED ***")
         self:startGame()
     end
 end
 
 ---Start the game with current settings
 function MenuSystem:startGame()
-    self:createGame(self.game_settings)
+    GamePrint("[BINGO] MenuSystem:startGame() called!")
+    print("DEBUG: MenuSystem:startGame() called")
     
-    -- Navigate to waiting for reveal
-    self:navigate(MenuSystem.State.WAITING_FOR_REVEAL, false)
+    local success, err = pcall(function()
+        GamePrint("[BINGO] About to call createGame with board_size=" .. tostring(self.game_settings.board_size))
+        self:createGame(self.game_settings)
+        GamePrint("[BINGO] createGame completed successfully")
+    end)
     
-    -- Close menu
+    if not success then
+        GamePrint("[BINGO] ERROR in createGame: " .. tostring(err))
+        print("ERROR in createGame: " .. tostring(err))
+        return
+    end
+    
+    -- Check if game was created
+    if not BingoBoardState.current_game then
+        GamePrint("[BINGO] ERROR: current_game was not set!")
+        print("ERROR: current_game was not set after createGame")
+        return
+    end
+    
+    GamePrint("[BINGO] Game created successfully, closing menu...")
+    print("DEBUG: Game created successfully")
+    
+    -- Close menu to show the board
     self:close()
+    
+    -- Verify menu is closed
+    if self:isOpen() then
+        GamePrint("[BINGO] WARNING: Menu is still open after close()")
+    else
+        GamePrint("[BINGO] Menu closed successfully")
+    end
 end
 
 ---Create a game with specified settings (used by multiplayer integration)
 ---@param settings table Game settings
 function MenuSystem:createGame(settings)
+    GamePrint("[BINGO] MenuSystem:createGame() called")
+    print("DEBUG: createGame started")
+    
     -- Parse settings
     local board_size = 5
     if settings.board_size then
@@ -928,11 +1013,40 @@ function MenuSystem:createGame(settings)
         board_size = settings.board_size_num
     end
     
+    GamePrint("[BINGO] Board size: " .. board_size)
+    
     local game_mode = settings.game_mode or settings.selected_mode or self.selected_mode or "traditional"
+    GamePrint("[BINGO] Game mode: " .. game_mode)
+    
     local is_multiplayer = settings.is_multiplayer
     if is_multiplayer == nil then
         is_multiplayer = self.is_multiplayer and self.multiplayer_type == MenuSystem.MultiplayerType.EVAISA_MP
     end
+    GamePrint("[BINGO] Is multiplayer: " .. tostring(is_multiplayer))
+    
+    -- Check if required systems exist
+    if not BingoCore or not BingoCore.BoardGenerator then
+        GamePrint("[BINGO] ERROR: BingoCore.BoardGenerator not available!")
+        print("ERROR: BingoCore.BoardGenerator is nil")
+        return nil
+    end
+    
+    -- IMPORTANT: Update the global settings before board generation!
+    if BingoConfig and BingoConfig.settings then
+        GamePrint("[BINGO] Updating BingoConfig.settings with board_size=" .. board_size)
+        BingoConfig.settings:set("board_size", board_size)
+        
+        -- Also update category limits if provided
+        if settings.category_limits then
+            for category, limit in pairs(settings.category_limits) do
+                BingoConfig.settings:set("category_limits." .. category, limit)
+            end
+        end
+    else
+        GamePrint("[BINGO] WARNING: BingoConfig.settings not available!")
+    end
+    
+    GamePrint("[BINGO] About to call BoardGenerator.createNewGame")
     
     -- Generate board based on settings
     local game = BingoCore.BoardGenerator.createNewGame(
@@ -940,18 +1054,32 @@ function MenuSystem:createGame(settings)
         is_multiplayer
     )
     
-    -- Apply settings to game
-    game.board.size = board_size
+    if not game then
+        GamePrint("[BINGO] ERROR: BoardGenerator returned nil!")
+        print("ERROR: BoardGenerator.createNewGame returned nil")
+        return nil
+    end
+    
+    GamePrint("[BINGO] Game object created, verifying board...")
+    
+    -- Verify board was created
+    if game.board then
+        GamePrint("[BINGO] Board exists, size=" .. tostring(game.board.size))
+    else
+        GamePrint("[BINGO] WARNING: game.board is nil!")
+    end
+    
+    -- Apply additional settings to game
     if settings.difficulty then
         game.difficulty = settings.difficulty
     end
     if settings.seed and settings.seed ~= "" then
         game.seed = settings.seed
-        -- TODO: Apply seed to board generation
     end
     
     -- Set current game
     BingoBoardState.current_game = game
+    GamePrint("[BINGO] Game set in BingoBoardState.current_game")
     
     print("MenuSystem: Created game - Mode: " .. game_mode .. ", Size: " .. board_size .. "x" .. board_size .. ", Multiplayer: " .. tostring(is_multiplayer))
 end
