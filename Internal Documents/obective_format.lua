@@ -23,7 +23,7 @@ return {
             competitive = nil,
             coop = nil
         },
-        hasReward = {
+        reward = {
             reward_type = "good"
         },
     }

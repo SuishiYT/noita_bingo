@@ -2,6 +2,9 @@
 -- Declarative detection engine that automatically detects objective completion
 -- without requiring manual configuration per objective
 
+-- Frame counter for debug output throttling (module-level)
+local auto_tracker_debug_frame_counter = 0
+
 ---@class AutoTracker
 ---@field tracked_objectives table<string, {completed: boolean, state: table}>
 ---@field event_history table<string, number> Event name -> timestamp of last occurrence
@@ -39,7 +42,11 @@ end
 ---Get player entity
 ---@return integer|nil
 local function getPlayerEntity()
-    return GameGetWorldStateEntity()
+    local players = EntityGetWithTag("player_unit")
+    if players and #players > 0 then
+        return players[1]
+    end
+    return nil
 end
 
 ---Get player position
@@ -80,20 +87,9 @@ end
 ---@param perk_id string
 ---@return boolean
 local function hasPlayerPerk(perk_id)
-    local player = getPlayerEntity()
-    if not player then return false end
-    
-    local perks = EntityGetComponent(player, "PerkPickupComponent")
-    if perks then
-        for _, perk_comp in ipairs(perks) do
-            local perk_name = ComponentGetValue2(perk_comp, "perk_id")
-            if perk_name == perk_id then
-                return true
-            end
-        end
-    end
-    
-    return false
+    -- In Noita, perks are tracked via run flags
+    -- The perk flag format is "perk_<perk_id>"
+    return GameHasFlagRun("perk_" .. perk_id)
 end
 
 ---Get player's current wands
@@ -103,19 +99,13 @@ local function getPlayerWands()
     if not player then return {} end
     
     local wands = {}
-    local inventory = EntityGetComponent(player, "ItemContainer")
+    local inventory = GameGetAllInventoryItems(player)
     
     if inventory then
-        for _, inv_comp in ipairs(inventory) do
-            local items = ComponentGetVector(inv_comp, "items", "int")
-            if items then
-                for _, item_id in ipairs(items) do
-                    local item_entity = item_id
-                    local filename = EntityGetFilename(item_entity)
-                    if filename and string.match(filename, "wand") then
-                        table.insert(wands, item_entity)
-                    end
-                end
+        for _, item_id in ipairs(inventory) do
+            local filename = EntityGetFilename(item_id)
+            if filename and string.match(filename, "wand") then
+                table.insert(wands, item_id)
             end
         end
     end
@@ -154,26 +144,21 @@ local function countInventoryItems(item_name, exclude_liquids)
     if not player then return 0 end
     
     local count = 0
-    local inventory = EntityGetComponent(player, "ItemContainer")
+    local inventory = GameGetAllInventoryItems(player)
     
     if inventory then
-        for _, inv_comp in ipairs(inventory) do
-            local items = ComponentGetVector(inv_comp, "items", "int")
-            if items then
-                for _, item_id in ipairs(items) do
-                    local filename = EntityGetFilename(item_id)
-                    
-                    if exclude_liquids then
-                        if not string.match(filename or "", "potion") then
-                            if not item_name or string.match(filename or "", item_name) then
-                                count = count + 1
-                            end
-                        end
-                    else
-                        if not item_name or string.match(filename or "", item_name) then
-                            count = count + 1
-                        end
+        for _, item_id in ipairs(inventory) do
+            local filename = EntityGetFilename(item_id)
+            
+            if exclude_liquids then
+                if not string.match(filename or "", "potion") then
+                    if not item_name or string.match(filename or "", item_name) then
+                        count = count + 1
                     end
+                end
+            else
+                if not item_name or string.match(filename or "", item_name) then
+                    count = count + 1
                 end
             end
         end
@@ -199,20 +184,20 @@ end
 ---Get number of recent kills with a specific condition
 ---@param kill_condition string "explosion" | "kick" | "tablet" | nil for any
 ---@return integer
-local function getRecentKillsWithCondition(kill_condition)
+local function getRecentKillsWithCondition(tracker, kill_condition)
     -- This would need to hook into death events
     -- For now, return tracked count
     if not kill_condition then
-        return AutoTracker.kill_history.total_kills
+        return tracker.kill_history.total_kills
     end
     
-    return AutoTracker.kill_history.kills_by_type[kill_condition] or 0
+    return tracker.kill_history.kills_by_type[kill_condition] or 0
 end
 
 ---Get player death count
 ---@return integer
-local function getPlayerDeaths()
-    return AutoTracker.kill_history.player_deaths
+local function getPlayerDeaths(tracker)
+    return tracker.kill_history.player_deaths
 end
 
 ---Get game time in seconds
@@ -302,10 +287,11 @@ end
 local DETECTOR_HANDLERS = {}
 
 ---Detect: Player reached a specific biome
+---@param tracker AutoTracker
 ---@param obj Objective
 ---@param config table {biome_name: string}
 ---@return boolean
-function DETECTOR_HANDLERS.biome_reach(obj, config)
+function DETECTOR_HANDLERS.biome_reach(tracker, obj, config)
     local current = getCurrentBiome()
     
     -- Check if currently in biome OR if event was recorded
@@ -313,31 +299,35 @@ function DETECTOR_HANDLERS.biome_reach(obj, config)
         return true
     end
     
-    -- Note: event_history check moved to checkObjective where 'self' is available
-    return false
+    -- Also check event history for recorded biome reach
+    local event_name = "biome_reached_" .. config.biome_name
+    return (tracker.event_history[event_name] or 0) > 0
 end
 
 ---Detect: Player has a specific perk
+---@param tracker AutoTracker
 ---@param obj Objective
 ---@param config table {perk_id: string}
 ---@return boolean
-function DETECTOR_HANDLERS.perk_obtain(obj, config)
+function DETECTOR_HANDLERS.perk_obtain(tracker, obj, config)
     return hasPlayerPerk(config.perk_id)
 end
 
 ---Detect: Player gold >= threshold
+---@param tracker AutoTracker
 ---@param obj Objective
 ---@param config table {min_gold: number}
 ---@return boolean
-function DETECTOR_HANDLERS.gold_collect(obj, config)
+function DETECTOR_HANDLERS.gold_collect(tracker, obj, config)
     return getPlayerGold() >= (config.min_gold or 0)
 end
 
 ---Detect: Wand meets specific conditions
+---@param tracker AutoTracker
 ---@param obj Objective
 ---@param config table {conditions: table[], require_all: boolean}
 ---@return boolean
-function DETECTOR_HANDLERS.wand_analysis(obj, config)
+function DETECTOR_HANDLERS.wand_analysis(tracker, obj, config)
     local wands = getPlayerWands()
     
     if #wands == 0 then
@@ -370,59 +360,65 @@ function DETECTOR_HANDLERS.wand_analysis(obj, config)
 end
 
 ---Detect: Inventory item count
+---@param tracker AutoTracker
 ---@param obj Objective
 ---@param config table {item_name: string, min_count: number, exclude_liquids: boolean}
 ---@return boolean
-function DETECTOR_HANDLERS.inventory_count(obj, config)
+function DETECTOR_HANDLERS.inventory_count(tracker, obj, config)
     local count = countInventoryItems(config.item_name, config.exclude_liquids)
     return count >= (config.min_count or 0)
 end
 
 ---Detect: Kill enemies with condition
+---@param tracker AutoTracker
 ---@param obj Objective
 ---@param config table {condition: string, min_kills: number}
 ---@return boolean
-function DETECTOR_HANDLERS.kill_with_condition(obj, config)
-    local kills = getRecentKillsWithCondition(config.condition)
+function DETECTOR_HANDLERS.kill_with_condition(tracker, obj, config)
+    local kills = getRecentKillsWithCondition(tracker, config.condition)
     return kills >= (config.min_kills or 1)
 end
 
 ---Detect: Player deaths
+---@param tracker AutoTracker
 ---@param obj Objective
 ---@param config table {min_deaths: number}
 ---@return boolean
-function DETECTOR_HANDLERS.death_count(obj, config)
-    return getPlayerDeaths() >= (config.min_deaths or 1)
+function DETECTOR_HANDLERS.death_count(tracker, obj, config)
+    return getPlayerDeaths(tracker) >= (config.min_deaths or 1)
 end
 
 ---Detect: Survived X seconds
+---@param tracker AutoTracker
 ---@param obj Objective
 ---@param config table {min_time: number}
 ---@return boolean
-function DETECTOR_HANDLERS.time_survive(obj, config)
+function DETECTOR_HANDLERS.time_survive(tracker, obj, config)
     return getGameTime() >= (config.min_time or 0)
 end
 
 ---Detect: Event was triggered
+---@param tracker AutoTracker
 ---@param obj Objective
 ---@param config table {event_name: string}
 ---@return boolean
-function DETECTOR_HANDLERS.event_triggered(obj, config)
-    return (AutoTracker.event_history[config.event_name] or 0) > 0
+function DETECTOR_HANDLERS.event_triggered(tracker, obj, config)
+    return (tracker.event_history[config.event_name] or 0) > 0
 end
 
 ---Detect: Multiple objectives with AND/OR logic
+---@param tracker AutoTracker
 ---@param obj Objective
 ---@param config table {objectives: table[], logic: "and"|"or"}
 ---@return boolean
-function DETECTOR_HANDLERS.composite(obj, config)
+function DETECTOR_HANDLERS.composite(tracker, obj, config)
     local logic = config.logic or "and"
     local results = {}
     
     for _, sub_config in ipairs(config.objectives or {}) do
         local detector = DETECTOR_HANDLERS[sub_config.type]
         if detector then
-            table.insert(results, detector(obj, sub_config))
+            table.insert(results, detector(tracker, obj, sub_config))
         end
     end
     
@@ -469,11 +465,35 @@ end
 ---@param objective Objective
 ---@return boolean
 function AutoTracker:checkObjective(objective)
+    if not objective then
+        print("DEBUG: checkObjective called with nil objective")
+        return false
+    end
+    
     if not objective.auto_track then
         return false
     end
     
     local auto_track = objective.auto_track
+    
+    -- Debug: log all checks for kill_with_condition type
+    if auto_track.type == "kill_with_condition" then
+        local kills = getRecentKillsWithCondition(self, auto_track.condition)
+        if auto_tracker_debug_frame_counter % 600 == 0 then
+            print(string.format("DEBUG checkObj kill_with_condition: %s | kills=%d min=%d",
+                objective.id, kills, auto_track.min_kills or 1))
+        end
+    end
+    
+    -- Debug: log all event_triggered checks
+    if auto_track.type == "event_triggered" then
+        local event_name = auto_track.event_name
+        local event_recorded = (self.event_history[event_name] or 0) > 0
+        if auto_tracker_debug_frame_counter % 600 == 0 then
+            print(string.format("DEBUG checkObj event_triggered: %s | event=%s | recorded=%s",
+                objective.id, event_name, tostring(event_recorded)))
+        end
+    end
     
     -- Special handling for biome_reach to check event history
     if auto_track.type == "biome_reach" then
@@ -493,7 +513,13 @@ function AutoTracker:checkObjective(objective)
         return false
     end
     
-    local result = detector(objective, auto_track)
+    -- Pass self as first argument so detectors can access tracker instance
+    local result = detector(self, objective, auto_track)
+    
+    if auto_track.type == "event_triggered" and result then
+        print(string.format("*** EVENT DETECTED AND MATCHED: %s", objective.id))
+    end
+    
     return result
 end
 
@@ -513,10 +539,18 @@ end
 ---@param objectives_list table Array of Objective
 ---@return table cleared_positions Array of {row, col} that were auto-cleared
 function AutoTracker:autoCheckBoard(board, objectives_list)
+    auto_tracker_debug_frame_counter = auto_tracker_debug_frame_counter + 1
     local cleared_positions = {}
     
     if not board or not objectives_list then
+        if auto_tracker_debug_frame_counter % 600 == 0 then
+            print("DEBUG: autoCheckBoard - board or objectives_list is nil")
+        end
         return cleared_positions
+    end
+    
+    if auto_tracker_debug_frame_counter % 600 == 0 then
+        print(string.format("DEBUG: autoCheckBoard checking %d objectives against %dx%d board", #objectives_list, board.size, board.size))
     end
     
     for i, objective in ipairs(objectives_list) do
@@ -526,14 +560,21 @@ function AutoTracker:autoCheckBoard(board, objectives_list)
         
         -- Skip if already cleared
         if board:isCleared(row, col) then
+            -- print(string.format("DEBUG: Square (%d,%d) already cleared", row, col))
             goto continue
         end
         
         -- Check if objective is completed
-        if self:checkObjective(objective) then
+        local result = self:checkObjective(objective)
+        if auto_tracker_debug_frame_counter % 600 == 0 and i <= 3 then
+            print(string.format("DEBUG: Checked objective %s (type=%s): result=%s", 
+                objective.id, objective.auto_track and objective.auto_track.type or "none", tostring(result)))
+        end
+        
+        if result then
             board:setClearedAt(row, col, true)
             table.insert(cleared_positions, {row = row, col = col})
-            print(string.format("AutoTracker: Auto-cleared %s (%d,%d)", objective.id, row, col))
+            print(string.format("AutoTracker: Auto-cleared %s (%d,%d)", objective.id or "unknown", row, col))
         end
         
         ::continue::

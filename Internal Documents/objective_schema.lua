@@ -7,8 +7,8 @@
 ---@field luck number
 ---@field difficulty "easy" | "medium" | "hard"
 ---@field count Count | nil
----@field hasReward Reward | nil
-
+---@field reward Reward | nil
+`
 ---@class Count
 ---@field competitive number
 ---@field coop number
@@ -50,14 +50,14 @@ function Objective.new(data)
         self.count = nil
     end
 
-    -- hasReward validation and assignment handler
-    if data.hasReward ~= nil then
-        if data.hasReward.reward_type == nil then error("If hasReward is true, reward_type must be specified") end
-        self.hasReward = {
-            reward_type = data.hasReward.reward_type
+    -- reward validation and assignment handler
+    if data.reward ~= nil then
+        if data.reward.reward_type == nil then error("If reward is specified, reward_type must be specified") end
+        self.reward = {
+            reward_type = data.reward.reward_type
         }
     else
-        self.hasReward = nil
+        self.reward = nil
     end
 
     return self

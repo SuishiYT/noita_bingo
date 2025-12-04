@@ -2,10 +2,10 @@
 -- Orchestrates all UI components using Noita's GUI API
 
 -- Key constants (from data/scripts/debug/keycodes.lua)
-local Key_F7 = 64
-local Key_F8 = 65
-local Key_F9 = 66
-local Key_F10 = 67
+local Key_Z = 29      -- Full Screen
+local Key_X = 27      -- Large Board
+local Key_C = 6       -- Small Board
+local Key_R = 21      -- Hidden/Toggle
 
 ---@class UIManager
 local UIManager = {}
@@ -40,10 +40,10 @@ function UIManager.new()
     
     -- Hotkeys
     self.hotkeys = {
-        full_screen = "f6",
-        large = "f7",
-        small = "f8",
-        hidden = "f9"
+        full_screen = "z",
+        large = "x",
+        small = "c",
+        hidden = "r"
     }
     
     return self
@@ -92,13 +92,13 @@ end
 ---@param dt number
 function UIManager:update(dt)
     -- Handle hotkeys
-    if InputIsKeyJustDown(Key_F7) then
+    if InputIsKeyJustDown(Key_Z) then
         self:setMode("full_screen")
-    elseif InputIsKeyJustDown(Key_F8) then
+    elseif InputIsKeyJustDown(Key_X) then
         self:setMode("large")
-    elseif InputIsKeyJustDown(Key_F9) then
+    elseif InputIsKeyJustDown(Key_C) then
         self:setMode("small")
-    elseif InputIsKeyJustDown(Key_F10) then
+    elseif InputIsKeyJustDown(Key_R) then
         if self.current_mode == "hidden" then
             self:setMode(self.last_board_mode)
         else

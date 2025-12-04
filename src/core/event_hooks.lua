@@ -34,6 +34,16 @@ end
 local TRACKED_ENTITIES = {}
 local MAX_TRACKED_ENTITIES = 1000
 
+---Get the player entity safely
+---@return int|nil player_entity
+function getPlayer()
+    local players = EntityGetWithTag("player_unit")
+    if players and #players > 0 then
+        return players[1]
+    end
+    return nil
+end
+
 ---Register an entity for death tracking
 ---@param entity int Entity ID
 function trackEntity(entity)
@@ -60,7 +70,7 @@ local PLAYER_LAST_STATE = {
 ---Detect if player died this frame
 ---@return boolean
 function didPlayerDie()
-    local player = GameGetPlayerStatsEntity()
+    local player = getPlayer()
     if not player then
         return false
     end
@@ -78,7 +88,7 @@ end
 ---Get player death cause
 ---@return string
 function getPlayerDeathCause()
-    local player = GameGetPlayerStatsEntity()
+    local player = getPlayer()
     if not player then return "unknown" end
     
     -- Check damage component for last damage type
@@ -108,7 +118,7 @@ end
 ---Detect player falling damage
 ---@return boolean
 function detectFallDamage()
-    local player = GameGetPlayerStatsEntity()
+    local player = getPlayer()
     if not player then return false end
     
     local vel_x, vel_y = GameGetVelocityCompVelocity(player)
@@ -192,7 +202,7 @@ local CURRENT_FRAME = 0
 ---Detect polymorph status
 ---@return boolean
 function isPlayerPolymorphed()
-    local player = GameGetPlayerStatsEntity()
+    local player = getPlayer()
     if not player then return false end
     
     -- Check for polymorph component/effect
@@ -225,7 +235,7 @@ end
 ---@return boolean
 function detectFungalShift()
     -- Look for polymorph/perk changes that indicate fungal shift
-    local player = GameGetPlayerStatsEntity()
+    local player = getPlayer()
     if not player then return false end
     
     -- Check if reality shift particle effects exist
@@ -246,7 +256,7 @@ end
 ---Detect secret room discovery (treasure chests, special chambers)
 ---@return boolean
 function detectSecretRoomDiscovered()
-    local player = GameGetPlayerStatsEntity()
+    local player = getPlayer()
     if not player then return false end
     
     local player_x, player_y = EntityGetTransform(player)
@@ -289,40 +299,35 @@ local WAND_MOD_COUNT = 0
 ---Check if wand was modified this frame
 ---@return boolean
 function wasWandModifiedThisFrame()
-    local player = GameGetPlayerStatsEntity()
+    local player = getPlayer()
     if not player then return false end
     
     local current_wands = {}
-    local inventory = EntityGetComponent(player, "ItemContainer")
+    local inventory = GameGetAllInventoryItems(player)
     
     if inventory then
-        for _, inv_comp in ipairs(inventory) do
-            local items = ComponentGetVector(inv_comp, "items", "int")
-            if items then
-                for _, item_id in ipairs(items) do
-                    local filename = EntityGetFilename(item_id)
-                    if filename and string.match(filename, "wand") then
-                        current_wands[item_id] = true
-                        
-                        -- Check if this wand's state changed
-                        if not WAND_STATE_CACHE[item_id] then
-                            WAND_STATE_CACHE[item_id] = {
-                                capacity = 0,
-                                spells = {},
-                                modified = false
-                            }
-                        end
-                        
-                        local wand_comp = EntityGetFirstComponent(item_id, "ItemComponent")
-                        if wand_comp then
-                            local new_capacity = ComponentGetValue2(wand_comp, "mana_max") or 0
-                            
-                            if new_capacity ~= WAND_STATE_CACHE[item_id].capacity then
-                                WAND_STATE_CACHE[item_id].capacity = new_capacity
-                                WAND_MOD_COUNT = WAND_MOD_COUNT + 1
-                                return true
-                            end
-                        end
+        for _, item_id in ipairs(inventory) do
+            local filename = EntityGetFilename(item_id)
+            if filename and string.match(filename, "wand") then
+                current_wands[item_id] = true
+                
+                -- Check if this wand's state changed
+                if not WAND_STATE_CACHE[item_id] then
+                    WAND_STATE_CACHE[item_id] = {
+                        capacity = 0,
+                        spells = {},
+                        modified = false
+                    }
+                end
+                
+                local wand_comp = EntityGetFirstComponent(item_id, "ItemComponent")
+                if wand_comp then
+                    local new_capacity = ComponentGetValue2(wand_comp, "mana_max") or 0
+                    
+                    if new_capacity ~= WAND_STATE_CACHE[item_id].capacity then
+                        WAND_STATE_CACHE[item_id].capacity = new_capacity
+                        WAND_MOD_COUNT = WAND_MOD_COUNT + 1
+                        return true
                     end
                 end
             end
@@ -352,7 +357,9 @@ function updateEventTracking()
             local death_cause = getPlayerDeathCause()
             BingoBoardState.auto_tracker:recordDeath()
             BingoBoardState.auto_tracker:recordEvent("player_death_" .. death_cause)
-            print(string.format("Event: Player died (%s)", death_cause))
+            print(string.format("Event: Player died (%s) - recorded to auto_tracker", death_cause))
+        else
+            print("WARNING: auto_tracker not available when player died")
         end
     end
     
@@ -361,7 +368,9 @@ function updateEventTracking()
     if biome_changed then
         if BingoBoardState and BingoBoardState.auto_tracker then
             BingoBoardState.auto_tracker:recordEvent("biome_reached_" .. new_biome)
-            print(string.format("Event: Reached biome %s", new_biome))
+            print(string.format("Event: Reached biome %s - recorded to auto_tracker", new_biome))
+        else
+            print("WARNING: auto_tracker not available when biome changed")
         end
     end
     
@@ -369,15 +378,21 @@ function updateEventTracking()
     if didPlayerPolymorphThisFrame() then
         if BingoBoardState and BingoBoardState.auto_tracker then
             BingoBoardState.auto_tracker:recordEvent("player_polymorphed")
-            print("Event: Player polymorphed")
+            print("Event: Player polymorphed - recorded to auto_tracker")
+        else
+            print("WARNING: auto_tracker not available when player polymorphed")
         end
     end
     
     -- Track fungal shift
-    if detectFungalShift() then
+    local fungal_detected = detectFungalShift()
+    if fungal_detected then
+        print("DEBUG: detectFungalShift() returned TRUE")
         if BingoBoardState and BingoBoardState.auto_tracker then
             BingoBoardState.auto_tracker:recordEvent("fungal_shift")
-            print("Event: Fungal shift detected")
+            print("DEBUG: Fungal shift recorded to auto_tracker")
+        else
+            print("WARNING: auto_tracker not available when fungal shift detected")
         end
     end
     
@@ -385,7 +400,9 @@ function updateEventTracking()
     if wasWandModifiedThisFrame() then
         if BingoBoardState and BingoBoardState.auto_tracker then
             BingoBoardState.auto_tracker:recordKill("wand_modified")
-            print("Event: Wand modified")
+            print("Event: Wand modified - recorded to auto_tracker")
+        else
+            print("WARNING: auto_tracker not available when wand modified")
         end
     end
 end

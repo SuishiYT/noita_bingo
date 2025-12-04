@@ -42,6 +42,9 @@ function MenuSystem.new()
     self.previous_state = nil
     self.state_stack = {} -- For back navigation
     
+    -- Initialize Noita theme
+    self.theme = BingoUI.NoitaTheme.new()
+    
     -- Check if first time opening - show splash by default
     local splash_setting = ModSettingGet("noita_bingo.show_splash")
     -- On first run, splash_setting will be nil, so show splash
@@ -216,6 +219,16 @@ function MenuSystem:render(gui)
         return
     end
     
+    if not gui then
+        GamePrint("[BINGO] ERROR: GUI is nil in MenuSystem:render()")
+        return
+    end
+    
+    -- Debug: Print current state every frame (every 60 frames to avoid spam)
+    if GameGetFrameNum() % 60 == 0 then
+        GamePrint("[BINGO] RENDER: Current state = " .. tostring(self.current_state))
+    end
+    
     -- Note: GuiStartFrame is handled by the main update loop, not here
     -- Calling it twice breaks button functionality!
     
@@ -238,7 +251,10 @@ function MenuSystem:render(gui)
     elseif self.current_state == MenuSystem.State.SETTINGS then
         self:renderSettings(gui, screen_width, screen_height)
     elseif self.current_state == MenuSystem.State.GAME_CONTROLS then
-        self:renderGameControls(gui, screen_width, screen_height)
+        -- Game controls overlay is rendered differently during gameplay
+        -- This is handled by renderGameControlsOverlay which takes additional parameters
+        -- For now, just go back to main menu if accessed this way
+        self:goBack()
     elseif self.current_state == MenuSystem.State.WAITING_FOR_REVEAL then
         self:renderWaitingForReveal(gui, screen_width, screen_height)
     elseif self.current_state == MenuSystem.State.GAME_OVER then
@@ -250,94 +266,78 @@ end
 function MenuSystem:renderSplash(gui, screen_width, screen_height)
     -- Make splash screen responsive to screen size
     local menu_width = math.min(600, screen_width - 100)
-    local menu_height = math.min(400, screen_height - 100)
+    local menu_height = math.min(450, screen_height - 100)
     local menu_x = (screen_width - menu_width) / 2
     local menu_y = (screen_height - menu_height) / 2
     
-    -- Draw background using multiple overlapping rectangles for visibility
-    for i = 0, 4 do
-        GuiColorSetForNextWidget(gui, 0.1, 0.1, 0.1, 0.2)
-        GuiImage(gui, self:getID(), menu_x - i, menu_y - i, "data/ui_gfx/1x1_white.png", 1, menu_width + i*2, menu_height + i*2)
-    end
+    -- Draw themed panel background
+    self.theme:drawPanel(gui, self:getID(), menu_x, menu_y, menu_width, menu_height, "NOITA BINGO v0.1.0")
     
-    -- Draw border
-    GuiColorSetForNextWidget(gui, 0.8, 0.8, 0.8, 1)
-    GuiImage(gui, self:getID(), menu_x - 2, menu_y - 2, "data/ui_gfx/1x1_white.png", 1, menu_width + 4, 2) -- Top
-    GuiImage(gui, self:getID(), menu_x - 2, menu_y + menu_height, "data/ui_gfx/1x1_white.png", 1, menu_width + 4, 2) -- Bottom
-    GuiImage(gui, self:getID(), menu_x - 2, menu_y, "data/ui_gfx/1x1_white.png", 1, 2, menu_height) -- Left
-    GuiImage(gui, self:getID(), menu_x + menu_width, menu_y, "data/ui_gfx/1x1_white.png", 1, 2, menu_height) -- Right
-    
-    local current_y = menu_y + 20
-    
-    -- Title
-    GuiColorSetForNextWidget(gui, 1, 1, 0.2, 1) -- Yellow title
-    GuiText(gui, 0, 0, "NOITA BINGO v0.1.0")
-    
-    
-    -- Title
-    GuiColorSetForNextWidget(gui, 1, 1, 0.2, 1) -- Yellow title
-    GuiText(gui, menu_x + 200, current_y, "NOITA BINGO v0.1.0")
-    current_y = current_y + 30
+    local current_y = menu_y + 50
     
     -- Welcome message
-    GuiColorSetForNextWidget(gui, 0.8, 1, 0.8, 1) -- Light green
-    GuiText(gui, menu_x + 20, current_y, "Welcome to Noita Bingo!")
+    self.theme:setColor(gui, self.theme.Colors.text_accent)
+    GuiText(gui, menu_x + 30, current_y, "Welcome to Noita Bingo!")
+    current_y = current_y + 30
+    
+    -- Features section
+    self.theme:setColor(gui, self.theme.Colors.text_title)
+    GuiText(gui, menu_x + 30, current_y, "Features:")
+    current_y = current_y + 18
+    
+    self.theme:setColor(gui, self.theme.Colors.text_secondary)
+    GuiText(gui, menu_x + 40, current_y, "• Solo and multiplayer bingo games")
+    current_y = current_y + 15
+    GuiText(gui, menu_x + 40, current_y, "• Customizable objectives and categories")
+    current_y = current_y + 15
+    GuiText(gui, menu_x + 40, current_y, "• Multiple game modes (Traditional, Lockout, Rush)")
+    current_y = current_y + 15
+    GuiText(gui, menu_x + 40, current_y, "• Flexible board positioning")
     current_y = current_y + 25
     
-    -- Features
-    GuiColorSetForNextWidget(gui, 1, 1, 1, 1) -- White
-    GuiText(gui, menu_x + 20, current_y, "Features:")
-    current_y = current_y + 15
-    GuiText(gui, menu_x + 30, current_y, "• Solo and multiplayer bingo games")
-    current_y = current_y + 12
-    GuiText(gui, menu_x + 30, current_y, "• Customizable objectives and categories")
-    current_y = current_y + 12
-    GuiText(gui, menu_x + 30, current_y, "• Multiple game modes (Traditional, Lockout, Rush)")
-    current_y = current_y + 12
-    GuiText(gui, menu_x + 30, current_y, "• Flexible board positioning")
-    current_y = current_y + 20
+    -- Controls section
+    self.theme:setColor(gui, self.theme.Colors.text_title)
+    GuiText(gui, menu_x + 30, current_y, "Controls:")
+    current_y = current_y + 18
     
-    -- Controls
-    GuiColorSetForNextWidget(gui, 1, 1, 0.2, 1) -- Yellow
-    GuiText(gui, menu_x + 20, current_y, "Controls:")
-    current_y = current_y + 15
-    GuiColorSetForNextWidget(gui, 1, 1, 1, 1) -- White
-    GuiText(gui, menu_x + 30, current_y, "• F6 or T - Toggle this menu")
+    self.theme:setColor(gui, self.theme.Colors.text_secondary)
+    GuiText(gui, menu_x + 40, current_y, "• T - Toggle this menu")
     current_y = current_y + 12
-    GuiText(gui, menu_x + 30, current_y, "• F7 - Full screen board")
+    GuiText(gui, menu_x + 40, current_y, "• Z - Full screen board")
     current_y = current_y + 12
-    GuiText(gui, menu_x + 30, current_y, "• F8 - Large board")
+    GuiText(gui, menu_x + 40, current_y, "• X - Large board")
     current_y = current_y + 12
-    GuiText(gui, menu_x + 30, current_y, "• F9 - Small board")
+    GuiText(gui, menu_x + 40, current_y, "• C - Small board")
     current_y = current_y + 12
-    GuiText(gui, menu_x + 30, current_y, "• F10 - Hide/show board")
-    current_y = current_y + 20
+    GuiText(gui, menu_x + 40, current_y, "• R - Hide/show board")
+    current_y = current_y + 25
     
     -- Multiplayer note
     if not self:isEvaisaMpAvailable() then
-        GuiColorSetForNextWidget(gui, 1, 0.8, 0.2, 1) -- Orange
-        GuiText(gui, menu_x + 20, current_y, "Install 'Noita Online' mod for multiplayer!")
+        self.theme:setColor(gui, self.theme.Colors.text_warning)
+        GuiText(gui, menu_x + 30, current_y, "Install 'Noita Online' mod for multiplayer!")
         current_y = current_y + 20
     end
     
     -- "Don't show again" checkbox
-    local checkbox_x = menu_x + 20
-    local checkbox_y = menu_y + menu_height - 80
-    
+    local checkbox_x = menu_x + 30
+    local checkbox_y = menu_y + menu_height - 60
     local checkbox_id = self:getID()
     local checkbox_text = self.dont_show_splash_again and "[X] Don't show again" or "[ ] Don't show again"
-    local checkbox_clicked = GuiButton(gui, checkbox_id, checkbox_x, checkbox_y, checkbox_text)
     
-    if checkbox_clicked then
+    if GuiButton(gui, checkbox_id, checkbox_x, checkbox_y, checkbox_text) then
         self.dont_show_splash_again = not self.dont_show_splash_again
     end
     
     -- Continue button
-    local continue_id = self:getID()
-    local continue_button = GuiButton(gui, continue_id, menu_x + 200, menu_y + menu_height - 80, "Continue")
-    local enter_pressed = InputIsKeyJustDown(40) -- Enter key (key code 40)
+    local button_id = self:getID()
+    local button_x = menu_x + menu_width - 140
+    local button_y = menu_y + menu_height - 50
     
-    if continue_button or enter_pressed then
+    local button_clicked = GuiButton(gui, button_id, button_x, button_y, "Continue")
+    local enter_pressed = InputIsKeyJustDown(40) -- Enter key
+    
+    if button_clicked or enter_pressed then
         -- Only disable splash screen if checkbox is checked
         if self.dont_show_splash_again then
             ModSettingSet("noita_bingo.show_splash", "false")
@@ -346,104 +346,103 @@ function MenuSystem:renderSplash(gui, screen_width, screen_height)
         
         self:navigate(MenuSystem.State.MAIN_MENU, false)
     end
-    
-    -- Instructions
-    GuiColorSetForNextWidget(gui, 0.2, 1, 0.2, 1) -- Bright green
-    GuiText(gui, menu_x + 160, menu_y + menu_height - 60, "Click Continue or press ENTER")
 end
 
 ---Render main menu
 function MenuSystem:renderMainMenu(gui, screen_width, screen_height)
-    -- Make main menu responsive to screen size
-    local menu_width = math.min(400, screen_width - 100)
-    local menu_height = math.min(300, screen_height - 100)
-    local menu_x = (screen_width - menu_width) / 2
-    local menu_y = (screen_height - menu_height) / 2
+    local menu_x = screen_width / 2 - 150
+    local menu_y = screen_height / 2 - 180
+    local menu_width = 300
+    local menu_height = 360
     
-    -- Draw background using multiple overlapping rectangles
-    for i = 0, 4 do
-        GuiColorSetForNextWidget(gui, 0.1, 0.1, 0.1, 0.2)
-        GuiImage(gui, self:getID(), menu_x - i, menu_y - i, "data/ui_gfx/1x1_white.png", 1, menu_width + i*2, menu_height + i*2)
-    end
+    -- Get base GUI ID for this frame
+    local base_id = self:getID()
     
-    -- Draw border
-    GuiColorSetForNextWidget(gui, 0.8, 0.8, 0.8, 1)
-    GuiImage(gui, self:getID(), menu_x - 2, menu_y - 2, "data/ui_gfx/1x1_white.png", 1, menu_width + 4, 2) -- Top
-    GuiImage(gui, self:getID(), menu_x - 2, menu_y + menu_height, "data/ui_gfx/1x1_white.png", 1, menu_width + 4, 2) -- Bottom
-    GuiImage(gui, self:getID(), menu_x - 2, menu_y, "data/ui_gfx/1x1_white.png", 1, 2, menu_height) -- Left
-    GuiImage(gui, self:getID(), menu_x + menu_width, menu_y, "data/ui_gfx/1x1_white.png", 1, 2, menu_height) -- Right
+    -- Draw themed panel
+    self.theme:drawPanel(gui, base_id, menu_x, menu_y, menu_width, menu_height, "MAIN MENU")
     
-    -- Title
-    GuiColorSetForNextWidget(gui, 1, 1, 0.2, 1) -- Yellow
-    GuiText(gui, menu_x + 130, menu_y + 20, "NOITA BINGO")
-    
-    local button_y = menu_y + 80
+    local button_x = menu_x + 30
+    local button_y = menu_y + 60
     local button_spacing = 50
     
-    -- Menu buttons
-    local sp_id = get_gui_id()
-    local sp_clicked = GuiButton(gui, sp_id, menu_x + 130, button_y, "Singleplayer")
-    if sp_clicked then
-        self.is_multiplayer = false
-        self:navigate(MenuSystem.State.SINGLEPLAYER_MODE_SELECT)
+    -- Singleplayer button
+    if GuiButton(gui, base_id + 10, button_x, button_y, "Singleplayer") then
+        GamePrint("[BINGO] Singleplayer button clicked")
+        self:navigate(MenuSystem.State.SINGLEPLAYER_MODE_SELECT, true)
     end
-    
     button_y = button_y + button_spacing
-    local mp_id = get_gui_id()
-    local mp_clicked = GuiButton(gui, mp_id, menu_x + 130, button_y, "Multiplayer")
-    if mp_clicked then
-        self.is_multiplayer = true
-        self:navigate(MenuSystem.State.MULTIPLAYER_SETUP)
+    
+    -- Multiplayer button
+    if GuiButton(gui, base_id + 20, button_x, button_y, "Multiplayer") then
+        GamePrint("[BINGO] Multiplayer button clicked")
+        if self:isEvaisaMpAvailable() then
+            self:navigate(MenuSystem.State.MULTIPLAYER_SETUP, true)
+        else
+            self:navigate(MenuSystem.State.MULTIPLAYER_MODE_SELECT, true)
+        end
     end
-    
     button_y = button_y + button_spacing
-    local settings_id = get_gui_id()
-    local settings_clicked = GuiButton(gui, settings_id, menu_x + 130, button_y, "Settings")
-    if settings_clicked then
-        self:navigate(MenuSystem.State.SETTINGS)
+    
+    -- Settings button
+    if GuiButton(gui, base_id + 30, button_x, button_y, "Settings") then
+        GamePrint("[BINGO] Settings button clicked")
+        self:navigate(MenuSystem.State.SETTINGS, true)
+    end
+    button_y = button_y + button_spacing
+    
+    -- Close Menu button
+    if GuiButton(gui, base_id + 40, button_x, button_y, "Close Menu") then
+        GamePrint("[BINGO] Close Menu button clicked")
+        self:close()
     end
 end
 
 ---Render singleplayer mode selection
 function MenuSystem:renderSingleplayerModeSelect(gui, screen_width, screen_height)
-    local menu_width = math.min(400, screen_width - 100)
-    local menu_height = math.min(400, screen_height - 100)
+    local menu_width = math.min(450, screen_width - 100)
+    local menu_height = math.min(420, screen_height - 100)
     local menu_x = (screen_width - menu_width) / 2
     local menu_y = (screen_height - menu_height) / 2
     
-    -- Background
-    GuiColorSetForNextWidget(gui, 0.1, 0.1, 0.1, 0.95)
-    GuiImageNinePiece(gui, self:getID(), menu_x, menu_y, menu_width, menu_height, 0, "data/ui_gfx/decorations/9piece0_gray.png")
+    -- Draw panel title
+    GuiColorSetForNextWidget(gui, 1, 0.9, 0.3, 1) -- Golden
+    GuiText(gui, menu_x + 30, menu_y + 20, "SELECT GAME MODE")
     
-    -- Title
-    GuiText(gui, menu_x + 120, menu_y + 20, "Select Game Mode")
+    local current_y = menu_y + 60
+    local button_x = menu_x + 30
+    local base_id = self:getID()
     
-    -- Mode buttons
-    local button_y = menu_y + 60
-    local button_spacing = 70
-    
-    if self:renderButton(gui, menu_x + 100, button_y, "Traditional Bingo") then
+    -- Traditional Bingo button
+    if GuiButton(gui, base_id + 10, button_x, current_y, "Traditional Bingo") then
         self.selected_mode = MenuSystem.GameMode.TRADITIONAL
         self:navigate(MenuSystem.State.GAME_SETTINGS)
     end
-    GuiText(gui, menu_x + 100, button_y + 20, "Get 5 in a row (horizontal, vertical, or diagonal)")
     
-    button_y = button_y + button_spacing
-    if self:renderButton(gui, menu_x + 100, button_y, "Blackout") then
+    GuiColorSetForNextWidget(gui, 0.7, 0.7, 0.7, 1)
+    GuiText(gui, button_x + 10, current_y + 35, "Get 5 in a row (horizontal, vertical, or diagonal)")
+    current_y = current_y + 70
+    
+    -- Blackout button
+    if GuiButton(gui, base_id + 20, button_x, current_y, "Blackout") then
         self.selected_mode = MenuSystem.GameMode.BLACKOUT
         self:navigate(MenuSystem.State.GAME_SETTINGS)
     end
-    GuiText(gui, menu_x + 100, button_y + 20, "Complete all squares on the board")
     
-    button_y = button_y + button_spacing
-    if self:renderButton(gui, menu_x + 100, button_y, "Rush") then
+    GuiColorSetForNextWidget(gui, 0.7, 0.7, 0.7, 1)
+    GuiText(gui, button_x + 10, current_y + 35, "Complete all squares on the board")
+    current_y = current_y + 70
+    
+    -- Rush button
+    if GuiButton(gui, base_id + 30, button_x, current_y, "Rush") then
         self.selected_mode = MenuSystem.GameMode.RUSH
         self:navigate(MenuSystem.State.GAME_SETTINGS)
     end
-    GuiText(gui, menu_x + 100, button_y + 20, "Complete objectives before time runs out")
+    
+    GuiColorSetForNextWidget(gui, 0.7, 0.7, 0.7, 1)
+    GuiText(gui, button_x + 10, current_y + 35, "Complete objectives before time runs out")
     
     -- Back button
-    if self:renderButton(gui, menu_x + 20, menu_y + menu_height - 40, "Back") then
+    if GuiButton(gui, base_id + 40, button_x, menu_y + menu_height - 50, "Back") then
         self:goBack()
     end
 end
@@ -489,10 +488,20 @@ function MenuSystem:startGame()
     })
     
     print("Bingo: Game created successfully")
+    print(string.format("Bingo: Game has %d objectives", game.objectives and #game.objectives or 0))
     GamePrint("[BINGO] Game started!")
     
     -- Set the global game state
     BingoBoardState.current_game = game
+    print(string.format("Bingo: After assignment, game has %d objectives", BingoBoardState.current_game.objectives and #BingoBoardState.current_game.objectives or 0))
+    
+    -- Initialize auto-tracker for objective tracking
+    if BingoCore.AutoTracker then
+        BingoBoardState.auto_tracker = BingoCore.AutoTracker.new()
+        GamePrint("[BINGO] Auto-tracker initialized")
+    else
+        GamePrint("[BINGO] WARNING: AutoTracker not available")
+    end
     
     -- Close the menu to show the board
     self:close()
@@ -722,276 +731,75 @@ end
 
 ---Render game settings
 function MenuSystem:renderGameSettings(gui, screen_width, screen_height)
-    if GameGetFrameNum() % 120 == 0 then
-        GamePrint("[BINGO] renderGameSettings is being called")
-    end
-    
-    -- Make menu responsive to screen size with constraints
-    local menu_width = math.min(700, screen_width - 100)  -- Leave 100px margin
-    local menu_height = math.min(500, screen_height - 100) -- Leave 100px margin
+    local menu_width = math.min(700, screen_width - 100)
+    local menu_height = math.min(550, screen_height - 100)
     local menu_x = (screen_width - menu_width) / 2
     local menu_y = (screen_height - menu_height) / 2
     
-    -- Background
-    GuiColorSetForNextWidget(gui, 0.1, 0.1, 0.1, 0.95)
-    GuiImageNinePiece(gui, self:getID(), menu_x, menu_y, menu_width, menu_height, 0, "data/ui_gfx/decorations/9piece0_gray.png")
-    
     -- Title
-    GuiText(gui, menu_x + 250, menu_y + 20, "Game Settings")
+    GuiColorSetForNextWidget(gui, 1, 0.9, 0.3, 1)
+    GuiText(gui, menu_x + 200, menu_y + 20, "GAME SETTINGS")
     
-    local content_y = menu_y + 50
+    local content_y = menu_y + 60
     local left_col = menu_x + 20
-    local right_col = menu_x + 360
+    local base_id = self:getID()
     
-    -- Preset selection
-    GuiText(gui, left_col, content_y, "Settings Preset:")
-    -- TODO: Implement dropdown for presets
-    GuiText(gui, left_col + 120, content_y, self.current_preset_name)
+    -- Game Mode Display
+    local mode_name = self.selected_mode == MenuSystem.GameMode.TRADITIONAL and "Traditional Bingo" or 
+                      self.selected_mode == MenuSystem.GameMode.BLACKOUT and "Blackout" or
+                      self.selected_mode == MenuSystem.GameMode.RUSH and "Rush" or "Unknown"
     
-    if GuiButton(gui, self:getID(), left_col + 250, content_y - 5, "Save As...") then
-        -- TODO: Open save preset dialog
+    GuiColorSetForNextWidget(gui, 0.7, 0.7, 0.7, 1)
+    GuiText(gui, left_col, content_y, "Game Mode: " .. mode_name)
+    content_y = content_y + 30
+    
+    -- Board Size
+    GuiColorSetForNextWidget(gui, 0.7, 0.7, 0.7, 1)
+    GuiText(gui, left_col, content_y, "Board Size:")
+    
+    if GuiButton(gui, base_id + 10, left_col + 130, content_y - 5, "5x5") then
+        self.game_settings.board_size = 5
     end
     
-    if GuiButton(gui, self:getID(), left_col + 340, content_y - 5, "Rename") then
-        -- TODO: Open rename dialog
+    if GuiButton(gui, base_id + 20, left_col + 200, content_y - 5, "6x6") then
+        self.game_settings.board_size = 6
     end
     
-    content_y = content_y + 35
-    
-    -- Category Limits (only for non-Rush modes)
-    if self.selected_mode ~= MenuSystem.GameMode.RUSH then
-        GuiText(gui, left_col, content_y, "Category Limits:")
-        content_y = content_y + 20
-        
-        local max_limit = self.game_settings.board_size * self.game_settings.board_size
-        local categories = {"bloodshed", "deaths", "wandbuilding", "inventory", "exploration", "events_misc"}
-        local total_limits = 0
-        
-        for _, category in ipairs(categories) do
-            local limit = self.game_settings.category_limits[category]
-            if limit then
-                total_limits = total_limits + limit
-            end
-        end
-        
-        for _, category in ipairs(categories) do
-            GuiText(gui, left_col + 10, content_y, category:sub(1,1):upper() .. category:sub(2) .. ":")
-            
-            local limit = self.game_settings.category_limits[category]
-            local limit_str = limit and tostring(limit) or "No Limit"
-            
-            -- Decrement button
-            if GuiButton(gui, self:getID(), left_col + 120, content_y - 5, "-") then
-                if limit and limit > 0 then
-                    self.game_settings.category_limits[category] = limit - 1
-                end
-            end
-            
-            GuiText(gui, left_col + 145, content_y, limit_str)
-            
-            -- Increment button
-            if GuiButton(gui, self:getID(), left_col + 220, content_y - 5, "+") then
-                if not limit then
-                    self.game_settings.category_limits[category] = 1
-                elseif total_limits < max_limit then
-                    self.game_settings.category_limits[category] = limit + 1
-                end
-            end
-            
-            -- No limit button
-            if GuiButton(gui, self:getID(), left_col + 250, content_y - 5, "No Limit") then
-                self.game_settings.category_limits[category] = nil
-            end
-            
-            content_y = content_y + 25
-        end
-        
-        GuiColorSetForNextWidget(gui, 0.7, 0.7, 0.7, 1)
-        GuiText(gui, left_col + 10, content_y, string.format("Total: %d / %d", total_limits, max_limit))
-        content_y = content_y + 30
+    if GuiButton(gui, base_id + 30, left_col + 270, content_y - 5, "7x7") then
+        self.game_settings.board_size = 7
     end
     
-    -- Right column - Timer settings
-    content_y = menu_y + 85
+    GuiColorSetForNextWidget(gui, 1, 1, 1, 1)
+    GuiText(gui, left_col + 350, content_y, "Current: " .. self.game_settings.board_size .. "x" .. self.game_settings.board_size)
     
-    GuiText(gui, right_col, content_y, "Timer Settings:")
-    content_y = content_y + 25
+    content_y = content_y + 50
     
-    -- Timer mode (Elapsed/Countdown)
-    if self.selected_mode == MenuSystem.GameMode.RUSH then
-        GuiText(gui, right_col + 10, content_y, "Mode: Countdown (Rush)")
-        self.game_settings.timer_mode = "countdown"
-        content_y = content_y + 25
-    else
-        GuiText(gui, right_col + 10, content_y, "Mode:")
-        
-        if GuiButton(gui, self:getID(), right_col + 70, content_y - 5, 
-            self.game_settings.timer_mode == "elapsed" and "[X] Elapsed" or "[ ] Elapsed") then
-            self.game_settings.timer_mode = "elapsed"
-        end
-        
-        if GuiButton(gui, self:getID(), right_col + 170, content_y - 5,
-            self.game_settings.timer_mode == "countdown" and "[X] Countdown" or "[ ] Countdown") then
-            self.game_settings.timer_mode = "countdown"
-        end
-        content_y = content_y + 25
+    -- Rewards
+    GuiColorSetForNextWidget(gui, 0.7, 0.7, 0.7, 1)
+    GuiText(gui, left_col, content_y, "Enable Rewards:")
+    
+    local reward_text = self.game_settings.enable_rewards and "ON" or "OFF"
+    
+    if GuiButton(gui, base_id + 40, left_col + 130, content_y - 5, "Toggle") then
+        self.game_settings.enable_rewards = not self.game_settings.enable_rewards
     end
     
-    -- Timer enable/disable (Elapsed only)
-    if self.game_settings.timer_mode == "elapsed" then
-        if GuiButton(gui, self:getID(), right_col + 10, content_y - 5,
-            self.game_settings.timer_enabled and "[X] Timer Enabled" or "[ ] Timer Disabled") then
-            self.game_settings.timer_enabled = not self.game_settings.timer_enabled
-        end
-        content_y = content_y + 25
-    end
+    local reward_color = self.game_settings.enable_rewards and 0x00FF00FF or 0xFF0000FF
+    local r = bit.band(bit.rshift(reward_color, 16), 0xFF) / 255
+    local g = bit.band(bit.rshift(reward_color, 8), 0xFF) / 255
+    local b = bit.band(reward_color, 0xFF) / 255
+    GuiColorSetForNextWidget(gui, r, g, b, 1)
+    GuiText(gui, left_col + 210, content_y, reward_text)
     
-    -- Countdown duration (Countdown only)
-    if self.game_settings.timer_mode == "countdown" then
-        GuiText(gui, right_col + 10, content_y, "Duration:")
-        content_y = content_y + 20
-        
-        local durations = {
-            {label = "1 Hour", seconds = 3600},
-            {label = "45 Minutes", seconds = 2700},
-            {label = "30 Minutes", seconds = 1800},
-            {label = "15 Minutes", seconds = 900},
-            {label = "Unlimited", seconds = 0},
-            {label = "Custom", seconds = -1}
-        }
-        
-        for _, duration in ipairs(durations) do
-            local selected = false
-            if duration.seconds == -1 then
-                -- Custom check
-                selected = not (self.game_settings.countdown_duration == 0 or
-                    self.game_settings.countdown_duration == 3600 or
-                    self.game_settings.countdown_duration == 2700 or
-                    self.game_settings.countdown_duration == 1800 or
-                    self.game_settings.countdown_duration == 900)
-            else
-                selected = self.game_settings.countdown_duration == duration.seconds
-            end
-            
-            if GuiButton(gui, self:getID(), right_col + 20, content_y - 5,
-                selected and "[X] " .. duration.label or "[ ] " .. duration.label) then
-                if duration.seconds == -1 then
-                    -- Custom - open input
-                    -- TODO: Text input for custom duration
-                    self.game_settings.countdown_duration = 600 -- 10 min default
-                elseif duration.seconds == 0 then
-                    -- Unlimited - disable timer
-                    self.game_settings.countdown_duration = 0
-                    self.game_settings.timer_enabled = false
-                else
-                    self.game_settings.countdown_duration = duration.seconds
-                    self.game_settings.timer_enabled = true
-                end
-            end
-            content_y = content_y + 20
-        end
-    end
+    content_y = content_y + 50
     
-    content_y = content_y + 20
-    
-    -- Reveal countdown
-    if GuiButton(gui, self:getID(), right_col + 10, content_y - 5,
-        self.game_settings.reveal_countdown and "[X] Reveal Countdown" or "[ ] Reveal Countdown") then
-        self.game_settings.reveal_countdown = not self.game_settings.reveal_countdown
-    end
-    content_y = content_y + 25
-    
-    if self.game_settings.reveal_countdown then
-        GuiText(gui, right_col + 20, content_y, "Countdown: " .. tostring(self.game_settings.reveal_countdown_duration) .. "s")
-        -- TODO: Add increment/decrement buttons
-        content_y = content_y + 25
-    end
-    
-    -- Rush-specific settings
-    if self.selected_mode == MenuSystem.GameMode.RUSH then
-        content_y = content_y + 10
-        GuiText(gui, right_col, content_y, "Rush Settings:")
-        content_y = content_y + 25
-        
-        GuiText(gui, right_col + 10, content_y, "Objectives at once:")
-        
-        if GuiButton(gui, self:getID(), right_col + 180, content_y - 5, "-") then
-            if self.game_settings.rush_objective_count > 3 then
-                self.game_settings.rush_objective_count = self.game_settings.rush_objective_count - 1
-            end
-        end
-        
-        GuiText(gui, right_col + 205, content_y, tostring(self.game_settings.rush_objective_count))
-        
-        if GuiButton(gui, self:getID(), right_col + 230, content_y - 5, "+") then
-            if self.game_settings.rush_objective_count < 9 then
-                self.game_settings.rush_objective_count = self.game_settings.rush_objective_count + 1
-            end
-        end
-    end
-    
-    -- Start/Back buttons - make them more visible
-    local button_y = menu_y + menu_height - 50
-    
-    -- Debug: Show where buttons should be
-    GuiColorSetForNextWidget(gui, 1, 1, 0, 1) -- Yellow debug text
-    GuiText(gui, menu_x + 200, button_y - 30, "Button area: " .. button_y .. " (menu_y=" .. menu_y .. ", height=" .. menu_height .. ")")
-    
-    -- Draw button areas for debugging
-    GuiColorSetForNextWidget(gui, 1, 0, 0, 0.3) -- Semi-transparent red
-    GuiImage(gui, self:getID(), menu_x + 15, button_y - 5, "data/ui_gfx/1x1_white.png", 1, 80, 30)
-    GuiColorSetForNextWidget(gui, 0, 1, 0, 0.3) -- Semi-transparent green  
-    GuiImage(gui, self:getID(), menu_x + menu_width - 125, button_y - 5, "data/ui_gfx/1x1_white.png", 1, 100, 30)
-    
-    -- Back button
-    GuiColorSetForNextWidget(gui, 1, 1, 1, 1) -- White text
-    if GuiButton(gui, self:getID(), menu_x + 20, button_y, "Back") then
-        self:goBack()
-    end
-    
-    -- Start Game button  
-    GuiColorSetForNextWidget(gui, 0.2, 1, 0.2, 1) -- Bright green
-    if self:renderButton(gui, menu_x + menu_width - 120, button_y, "Start Game") then
-        GamePrint("[BINGO] *** START GAME BUTTON CLICKED ***")
+    -- Start and Back buttons
+    if GuiButton(gui, base_id + 50, menu_x + menu_width - 280, menu_y + menu_height - 50, "Start Game") then
         self:startGame()
     end
-end
-
----Start the game with current settings
-function MenuSystem:startGame()
-    GamePrint("[BINGO] MenuSystem:startGame() called!")
-    print("DEBUG: MenuSystem:startGame() called")
     
-    local success, err = pcall(function()
-        GamePrint("[BINGO] About to call createGame with board_size=" .. tostring(self.game_settings.board_size))
-        self:createGame(self.game_settings)
-        GamePrint("[BINGO] createGame completed successfully")
-    end)
-    
-    if not success then
-        GamePrint("[BINGO] ERROR in createGame: " .. tostring(err))
-        print("ERROR in createGame: " .. tostring(err))
-        return
-    end
-    
-    -- Check if game was created
-    if not BingoBoardState.current_game then
-        GamePrint("[BINGO] ERROR: current_game was not set!")
-        print("ERROR: current_game was not set after createGame")
-        return
-    end
-    
-    GamePrint("[BINGO] Game created successfully, closing menu...")
-    print("DEBUG: Game created successfully")
-    
-    -- Close menu to show the board
-    self:close()
-    
-    -- Verify menu is closed
-    if self:isOpen() then
-        GamePrint("[BINGO] WARNING: Menu is still open after close()")
-    else
-        GamePrint("[BINGO] Menu closed successfully")
+    if GuiButton(gui, base_id + 60, menu_x + menu_width - 160, menu_y + menu_height - 50, "Back") then
+        self:goBack()
     end
 end
 
@@ -1147,9 +955,15 @@ function MenuSystem:renderSettings(gui, screen_width, screen_height)
     -- Hotkeys section
     GuiText(gui, menu_x + 20, content_y, "Hotkeys:")
     content_y = content_y + 20
-    GuiText(gui, menu_x + 30, content_y, "Open Menu: F6 (not rebindable)")
+    GuiText(gui, menu_x + 30, content_y, "Open Menu: T (Toggle)")
     content_y = content_y + 20
-    GuiText(gui, menu_x + 30, content_y, "Pause Timer: (configure in-game)")
+    GuiText(gui, menu_x + 30, content_y, "Full Screen: Z")
+    content_y = current_y + 15
+    GuiText(gui, menu_x + 30, content_y, "Large Board: X")
+    content_y = current_y + 15
+    GuiText(gui, menu_x + 30, content_y, "Small Board: C")
+    content_y = current_y + 15
+    GuiText(gui, menu_x + 30, content_y, "Hide/Show: R (Toggle)")
     
     -- Back button
     if GuiButton(gui, self:getID(), menu_x + 20, menu_y + menu_height - 40, "Back") then

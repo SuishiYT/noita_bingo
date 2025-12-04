@@ -51,6 +51,7 @@ local files_to_load = {
     "src/config/rewards.lua",
     
     -- UI system
+    "src/ui/noita_theme.lua",           -- Load theme system first
     "src/ui/board_positioning.lua",
     "src/ui/board_renderer_noita.lua",  -- Only load the Noita-specific version
     "src/ui/input_handler.lua",
@@ -318,11 +319,12 @@ function OnModInit()
         print("ERROR: BingoUI.MenuSystem not available - creating fallback")
         -- Create a minimal fallback menu system
         menu_system = {
-            isOpen = function() return false end,
-            open = function() GamePrint("Menu system not loaded properly!") end,
-            close = function() end,
+            current_state = "closed",
+            isOpen = function(self) return self.current_state ~= "closed" end,
+            open = function(self) self.current_state = "main_menu" end,
+            close = function(self) self.current_state = "closed" end,
             render = function() end,
-            current_state = "error"
+            state_stack = {}
         }
     end
     
@@ -358,12 +360,10 @@ function OnWorldPreUpdate()
     
     -- Handle input
     if menu_system then
-        -- Try multiple key codes for F6 and T
-        -- F6 is typically 63, but we'll check other variations too
-        local f6_pressed = InputIsKeyJustDown(63) or InputIsKeyJustDown(118) -- F6 or alternative
-        local t_pressed = InputIsKeyJustDown(23) or InputIsKeyJustDown(84) -- T or alternative
+        -- Menu hotkey: T to toggle
+        local t_pressed = InputIsKeyJustDown(23) -- T key
         
-        if f6_pressed or t_pressed then
+        if t_pressed then
             GamePrint("[BINGO] Menu key pressed!")
             if menu_system:isOpen() then
                 menu_system:close()
@@ -394,6 +394,9 @@ function OnWorldPreUpdate()
     end
     
     if BingoBoardState.current_game then
+        if debug_frame_counter % 300 == 0 then
+            print("DEBUG: OnWorldPreUpdate - BingoBoardState.current_game EXISTS")
+        end
         local dt = 1 / 60 -- Approximate delta time
         
         -- Don't update game time if timer is paused
@@ -403,6 +406,9 @@ function OnWorldPreUpdate()
         
         -- Update auto-tracker
         if BingoBoardState.auto_tracker then
+            if debug_frame_counter % 300 == 0 then
+                print("DEBUG: OnWorldPreUpdate - auto_tracker EXISTS")
+            end
             BingoBoardState.auto_tracker:update(dt)
             
             -- Update event tracking (detects kills, deaths, events)
@@ -412,14 +418,47 @@ function OnWorldPreUpdate()
             
             -- Auto-check board objectives every frame
             local board = BingoBoardState.current_game.board
-            if board and BingoBoardState.current_game.objectives then
-                local cleared = BingoBoardState.auto_tracker:autoCheckBoard(board, BingoBoardState.current_game.objectives)
+            local objectives = BingoBoardState.current_game.objectives
+            
+            if debug_frame_counter % 300 == 0 then
+                print(string.format("DEBUG: board=%s, objectives=%s (count=%d)", 
+                    tostring(board), tostring(objectives), objectives and #objectives or 0))
+            end
+            
+            if board and objectives then
+                if debug_frame_counter % 300 == 0 then
+                    print(string.format("DEBUG: About to autoCheckBoard with %d objectives", #objectives))
+                end
+                local cleared = BingoBoardState.auto_tracker:autoCheckBoard(board, objectives)
+                
+                -- Debug: Log cleared squares with objective information
+                if #cleared > 0 then
+                    for _, pos in ipairs(cleared) do
+                        local obj_idx = (pos.row - 1) * board.size + pos.col
+                        local objective = BingoBoardState.current_game.objectives[obj_idx]
+                        local obj_title = objective and objective.title or "Unknown"
+                        GamePrint(string.format("[BINGO AUTO-DETECT] ✓ COMPLETED: %s (%d,%d)", obj_title, pos.row, pos.col))
+                    end
+                end
                 
                 -- Broadcast cleared squares to multiplayer if any were cleared
                 if #cleared > 0 and BingoMultiplayer and BingoMultiplayer.isMultiplayer() then
                     for _, pos in ipairs(cleared) do
                         BingoMultiplayer.clearSquare(pos.row, pos.col)
                     end
+                end
+                
+                -- Additional debug: show board state every 300 frames
+                if debug_frame_counter % 300 == 0 then
+                    local cleared_count = 0
+                    for row = 1, board.size do
+                        for col = 1, board.size do
+                            if board:isCleared(row, col) then
+                                cleared_count = cleared_count + 1
+                            end
+                        end
+                    end
+                    print(string.format("DEBUG: Board has %d/%d squares cleared", cleared_count, board.size * board.size))
                 end
             end
         end
@@ -456,7 +495,7 @@ function OnWorldPostUpdate()
             local is_open = menu_system:isOpen()
             if is_open then
                 GuiColorSetForNextWidget(gui, 0, 1, 0, 1) -- Green
-                GuiText(gui, screen_width - 400, screen_height - 50, "[BINGO] Menu is OPEN")
+                GuiText(gui, screen_width - 400, screen_height - 50, "[BINGO] Menu is OPEN, state=" .. menu_system.current_state)
             else
                 GuiColorSetForNextWidget(gui, 1, 0, 0, 1) -- Red
                 GuiText(gui, screen_width - 400, screen_height - 50, "[BINGO] Menu is CLOSED (Press F6/T)")
@@ -470,7 +509,12 @@ function OnWorldPostUpdate()
         if menu_system and menu_system:isOpen() then
             -- Try to render the actual menu
             if menu_system.render then
-                menu_system:render(gui)
+                local success, err = pcall(function()
+                    menu_system:render(gui)
+                end)
+                if not success then
+                    GamePrint("[BINGO] ERROR in menu render: " .. tostring(err))
+                end
             else
                 -- Fallback: render a simple test menu
                 GuiColorSetForNextWidget(gui, 0.2, 0.2, 0.2, 0.8)
@@ -478,17 +522,14 @@ function OnWorldPostUpdate()
                 
                 GuiColorSetForNextWidget(gui, 1, 1, 1, 1)
                 GuiText(gui, 120, 120, "TEST MENU - render() failed")
-                GuiText(gui, 120, 150, "menu_system.render = " .. tostring(menu_system.render))
+                GuiText(gui, 120, 150, "menu_system.render = nil")
             end
         end
         
         -- Render the bingo board
         if BingoBoardState.current_game then
-            GamePrint("[BINGO] Rendering board, game exists")
-            
             -- Ensure manager exists (create fallback if needed)
             if not BingoUI.manager then
-                GamePrint("[BINGO] Creating fallback UI manager...")
                 BingoUI.manager = { 
                     update = function() end,
                     render = function(self, game, gui)
@@ -503,10 +544,7 @@ function OnWorldPostUpdate()
                 }
             end
             
-            if not BingoUI.manager.render then
-                GamePrint("[BINGO] ERROR: BingoUI.manager.render is nil!")
-            else
-                GamePrint("[BINGO] Calling BingoUI.manager:render()")
+            if BingoUI.manager.render then
                 BingoUI.manager:render(BingoBoardState.current_game, gui)
             end
         else

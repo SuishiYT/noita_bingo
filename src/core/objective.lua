@@ -34,6 +34,9 @@ function Objective.new(data)
     self.reward_type = data.reward_type or "none"
     self.reward_value = data.reward_value or nil
     
+    -- Copy auto_track configuration if present
+    self.auto_track = data.auto_track or nil
+    
     return self
 end
 

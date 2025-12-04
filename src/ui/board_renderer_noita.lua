@@ -1,5 +1,5 @@
 -- Board Renderer for Noita
--- Handles rendering of the bingo board using Noita's GUI API
+-- Handles rendering of the bingo board using Noita's GUI API with Noita theme
 
 ---@class BoardRenderer
 local BoardRenderer = {}
@@ -8,19 +8,13 @@ BoardRenderer.__index = BoardRenderer
 function BoardRenderer.new()
     local self = setmetatable({}, BoardRenderer)
     
-    -- Color values (0-1 range for Noita GUI)
-    self.FRAME_COLOR = { r = 1, g = 1, b = 1, a = 1 }              -- White frame
-    self.BACKGROUND_COLOR = { r = 0, g = 0, b = 0, a = 0.7 }       -- Semi-transparent black
-    self.DIVIDER_COLOR = { r = 0.5, g = 0.5, b = 0.5, a = 0.5 }    -- Gray dividers
-    self.CLEARED_COLOR = { r = 0.2, g = 0.8, b = 0.2, a = 0.5 }    -- Green for cleared
-    self.LOCKED_COLOR = { r = 0.8, g = 0.2, b = 0.2, a = 0.5 }     -- Red for locked
-    self.TEXT_COLOR = { r = 1, g = 1, b = 1, a = 1 }               -- White text
-    self.BUTTON_COLOR = { r = 0.2, g = 0.2, b = 0.2, a = 0.8 }     -- Dark gray button
-    self.BUTTON_HOVER_COLOR = { r = 0.3, g = 0.3, b = 0.3, a = 0.9 } -- Lighter gray hover
+    -- Use Noita theme for colors
+    self.theme = BingoUI.NoitaTheme.new()
     
     self.FRAME_WIDTH = 3
-    self.DIVIDER_WIDTH = 2
+    self.DIVIDER_WIDTH = 1
     self.PADDING = 10
+    self.CELL_PADDING = 5
     
     return self
 end
@@ -44,7 +38,9 @@ end
 ---@param gui any
 ---@param color table
 function BoardRenderer:setColor(gui, color)
-    GuiColorSetForNextWidget(gui, color.r, color.g, color.b, color.a)
+    if color then
+        self.theme:setColor(gui, color)
+    end
 end
 
 ---Draw the bingo board at the specified position and size
@@ -61,9 +57,8 @@ function BoardRenderer:drawBoard(gui, board, x, y, width, height)
     
     local size = board.size
     
-    -- Draw background frame
-    self:setColor(gui, self.BACKGROUND_COLOR)
-    GuiImageNinePiece(gui, self:getID(), x, y, width, height, 0)
+    -- Draw background panel with theme
+    self.theme:drawPanel(gui, self:getID(), x, y, width, height)
     
     -- Calculate cell dimensions
     local cell_width = width / size
@@ -78,10 +73,6 @@ function BoardRenderer:drawBoard(gui, board, x, y, width, height)
             self:drawCell(gui, board, row, col, cell_x, cell_y, cell_width, cell_height)
         end
     end
-    
-    -- Draw border frame
-    self:setColor(gui, self.FRAME_COLOR)
-    GuiImageNinePiece(gui, self:getID(), x, y, width, height, 0, "data/ui_gfx/decorations/9piece0_gray.png")
 end
 
 ---Draw a single cell
@@ -102,31 +93,47 @@ function BoardRenderer:drawCell(gui, board, row, col, x, y, width, height)
     
     local cell_id = self:getID()
     
-    -- Draw cell background based on state
+    -- Determine cell color based on state
+    local cell_color
     if board:isCleared(row, col) then
         if board:isLocked(row, col) then
-            self:setColor(gui, self.LOCKED_COLOR)
+            cell_color = self.theme.Colors.square_locked
         else
-            self:setColor(gui, self.CLEARED_COLOR)
+            cell_color = self.theme.Colors.square_cleared
         end
     else
-        self:setColor(gui, self.BACKGROUND_COLOR)
+        cell_color = self.theme.Colors.square_empty
     end
     
+    -- Draw cell background
+    self:setColor(gui, cell_color)
+    GuiImage(gui, cell_id, x, y, self.theme.Textures.white_1x1, 1, width, height)
+    
+    -- Draw cell border
+    self:setColor(gui, self.theme.Colors.border_subtle)
+    GuiImage(gui, cell_id + 1, x, y, self.theme.Textures.white_1px, 1, width, 1)
+    GuiImage(gui, cell_id + 2, x, y + height - 1, self.theme.Textures.white_1px, 1, width, 1)
+    GuiImage(gui, cell_id + 3, x, y, self.theme.Textures.white_1px, 1, 1, height)
+    GuiImage(gui, cell_id + 4, x + width - 1, y, self.theme.Textures.white_1px, 1, 1, height)
+    
     -- Make cell clickable for marking
-    if GuiButton(gui, cell_id, x, y, "") then
+    if GuiButton(gui, cell_id + 5, x, y, "") then
         -- Toggle cleared state
         board:setClearedAt(row, col, not board:isCleared(row, col))
     end
     
-    -- Draw objective text
-    self:setColor(gui, self.TEXT_COLOR)
+    -- Draw objective text (abbreviated if needed)
+    self:setColor(gui, self.theme.Colors.text_primary)
     
     -- Wrap text to fit in cell
     local text = objective.title
-    local text_x = x + self.PADDING
-    local text_y = y + self.PADDING
-    local text_width = width - self.PADDING * 2
+    -- Truncate text if too long
+    if #text > 20 then
+        text = text:sub(1, 17) .. "..."
+    end
+    
+    local text_x = x + self.CELL_PADDING
+    local text_y = y + self.CELL_PADDING
     
     GuiText(gui, text_x, text_y, text)
 end
